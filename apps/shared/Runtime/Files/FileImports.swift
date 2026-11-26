@@ -9,8 +9,13 @@ extension Conversation {
         var published: [FileItem] = []
         do {
             for source in staged {
+                let url = source.file.fileURL
+                if try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0 > FileLimits.fileBytes {
+                    published.append(try await importAttachment(contentsOf: url, fileName: source.file.displayName))
+                    continue
+                }
                 let draft = try await Task.detached(priority: .userInitiated) {
-                    FileImporter.Draft(data: try Data(contentsOf: source.file.fileURL), fileName: source.file.displayName)
+                    FileImporter.Draft(data: try Data(contentsOf: url), fileName: source.file.displayName)
                 }.value
                 published.append(try await importAttachment(draft))
             }
@@ -43,16 +48,8 @@ extension Conversation {
         if let reference = route.reference {
             return try await FileImporter.write(draft, in: scope, conversation: reference)
         }
-        let folder = "conversations/\(route.conversationID)/"
-        var name = draft.fileName
-        let existing = try await route.session.runtime.command(.object([
-            "action": .string("fileStat"), "path": .string(folder + name), "byPath": .bool(true),
-        ]))
-        if existing.objectValue?["file"] != .null {
-            name = FileStore.sanitizedFilename(UUID().uuidString + "-" + name)
-        }
-        let path = folder + name
-        let file = FileItem(fileName: name, directory: scope.root)
+        let path = try await attachmentPath(draft.fileName, route: route)
+        let file = FileItem(fileName: URL(fileURLWithPath: path).lastPathComponent, directory: scope.root)
         if file.kind == .text || file.kind == .html, let text = String(data: draft.data, encoding: .utf8) {
             _ = try await route.session.runtime.command(.object([
                 "action": .string("fileWrite"), "path": .string(path), "text": .string(text),
@@ -62,6 +59,28 @@ extension Conversation {
         }
         guard let published = await durableFile(path: path) else { throw RuntimeError.bridge("Imported file is unavailable") }
         return published.file
+    }
+
+    func importAttachment(contentsOf url: URL, fileName: String) async throws -> FileItem {
+        try await durablePreparation?.value
+        guard let route = durableRoute else { throw RuntimeError.bridge("Conversation files are unavailable") }
+        if let reference = route.reference {
+            return try await ProfileRepository.shared.importFile(contentsOf: url, suggestedName: fileName, in: scope, conversation: reference)
+        }
+        let path = try await attachmentPath(fileName, route: route)
+        try await route.session.runtime.writeFile(contentsOf: url, path: path)
+        guard let published = await durableFile(path: path) else { throw RuntimeError.bridge("Imported file is unavailable") }
+        Log.session.info("Conversation.importAttachment streamed conversation=\(id) file=\(published.file.fileName)")
+        return published.file
+    }
+
+    private func attachmentPath(_ fileName: String, route: DurableConversationRoute) async throws -> String {
+        let folder = "conversations/\(route.conversationID)/"
+        let existing = try await route.session.runtime.command(.object([
+            "action": .string("fileStat"), "path": .string(folder + fileName), "byPath": .bool(true),
+        ]))
+        guard existing.objectValue?["file"] != .null else { return folder + fileName }
+        return folder + FileStore.sanitizedFilename(UUID().uuidString + "-" + fileName)
     }
 
     func importRemoteMCPFiles(_ values: [RemoteMCPFile]) async throws {
@@ -120,13 +139,35 @@ nonisolated public enum FileImporter {
     }
 
     static func stage(_ draft: Draft) throws -> StagedFile {
+        try stage(named: draft.fileName) { destination in
+            try draft.data.write(to: destination, options: .atomic)
+            return draft.data.count
+        }
+    }
+
+    static func stage(fileAt url: URL) throws -> StagedFile {
+        guard !preparesInMemory(UTType(filenameExtension: url.pathExtension) ?? .data) else { return try stage(try fileDraft(at: url)) }
+        let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        guard size <= FileLimits.storedBytes else { throw FileError.fileTooLarge(bytes: size, limit: FileLimits.storedBytes) }
+        return try stage(named: FileStore.sanitizedFilename(url.lastPathComponent)) { destination in
+            try FileManager.default.copyItem(at: url, to: destination)
+            return size
+        }
+    }
+
+    private static func preparesInMemory(_ type: UTType) -> Bool {
+        type.conforms(to: .image) || type.conforms(to: .pdf) || type.conforms(to: .text) || type.conforms(to: .sourceCode)
+            || type.conforms(to: .json) || type.conforms(to: .commaSeparatedText)
+    }
+
+    private static func stage(named fileName: String, write: (URL) throws -> Int) throws -> StagedFile {
         let id = UUID().uuidString
         let directory = stagingDirectory.appendingPathComponent(id, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         do {
-            try draft.data.write(to: directory.appendingPathComponent(draft.fileName), options: .atomic)
-            Log.session.info("FileImporter.stage ready draft=\(id) bytes=\(draft.data.count)")
-            return StagedFile(file: FileItem(fileName: "draft-" + id, directory: directory, relativePath: draft.fileName))
+            let bytes = try write(directory.appendingPathComponent(fileName))
+            Log.session.info("FileImporter.stage ready draft=\(id) bytes=\(bytes)")
+            return StagedFile(file: FileItem(fileName: "draft-" + id, directory: directory, relativePath: fileName))
         } catch {
             try? FileManager.default.removeItem(at: directory)
             throw error

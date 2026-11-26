@@ -77,18 +77,35 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
     @discardableResult
     func writeFile(data: Data, path: String) async throws -> JSONValue {
         guard data.count <= FileLimits.fileBytes else { throw failure("File exceeds size limit") }
+        return try await writeFile(size: data.count, path: path) { range in data[range] }
+    }
+
+    @discardableResult
+    func writeFile(contentsOf url: URL, path: String) async throws -> JSONValue {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let size = Int(try handle.seekToEnd())
+        guard size <= FileLimits.storedBytes else { throw failure("File exceeds size limit") }
+        try handle.seek(toOffset: 0)
+        return try await writeFile(size: size, path: path) { range in
+            guard let data = try handle.read(upToCount: range.count), data.count == range.count else { throw CocoaError(.fileReadCorruptFile) }
+            return data
+        }
+    }
+
+    private func writeFile(size: Int, path: String, chunk: @escaping @Sendable (Range<Int>) throws -> Data) async throws -> JSONValue {
         try Task.checkCancellation()
         let cancelled = Mutex(false)
         let staged: JSONValue = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 nativeQueue.async { [self] in
                     do {
-                        guard let files, let token = try files.perform(["op": "filesStage", "size": data.count]) as? String else { throw failure("Cannot stage file") }
+                        guard let files, let token = try files.perform(["op": "filesStage", "size": size]) as? String else { throw failure("Cannot stage file") }
                         defer { _ = try? files.perform(["op": "release", "token": token]) }
-                        for offset in stride(from: 0, to: data.count, by: 128 * 1024) {
+                        for offset in stride(from: 0, to: size, by: 128 * 1024) {
                             if cancelled.withLock({ $0 }) { throw CancellationError() }
-                            let end = min(offset + 128 * 1024, data.count)
-                            _ = try files.perform(["op": "write", "token": token, "offset": offset, "bytes": Array(data[offset..<end])])
+                            let bytes = try chunk(offset..<min(offset + 128 * 1024, size))
+                            _ = try files.perform(["op": "write", "token": token, "offset": offset, "bytes": Array(bytes)])
                         }
                         if cancelled.withLock({ $0 }) { throw CancellationError() }
                         continuation.resume(returning: JSONValue.from(try files.perform(["op": "publish", "token": token])))
@@ -99,7 +116,7 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
             cancelled.withLock { $0 = true }
         }
         let result = try await command(.object(["action": .string("fileWriteStaged"), "path": .string(path), "file": staged]))
-        Log.agent.info("Filesystem.publish bytes=\(data.count) chunked=true")
+        Log.agent.info("Filesystem.publish bytes=\(size) chunked=true")
         return result
     }
 
@@ -117,7 +134,7 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
         let current = try await command(.object(["action": .string("fileStat"), "path": .string(reference)]))
         guard let fields = current.objectValue?["file"]?.objectValue, let path = fields["path"]?.stringValue,
               let size = fields["size"]?.intValue, let digest = fields["sha256"]?.stringValue,
-              (0...32 * 1024 * 1024).contains(size) else { throw failure("File unavailable") }
+              (0...(destination == nil ? FileLimits.fileBytes : FileLimits.storedBytes)).contains(size) else { throw failure("File unavailable") }
         for key in ["path", "size", "sha256"] {
             if let expected = file.objectValue?[key], expected != fields[key] { throw failure("File changed while preparing read; reacquire its metadata") }
         }

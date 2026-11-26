@@ -57,6 +57,8 @@ export const ProfileFileState = defineDoc<ProfileFileStateValue>({
   checkpointWhen: (_, __, info) => info.deltasSinceBase >= 31,
 });
 const context = BACKGROUND_CONTEXT;
+const wholeFileBytes = 32 * 1024 * 1024;
+const storedFileBytes = 2 * 1024 * 1024 * 1024;
 const reserved = new Set(["payloads", "staging", "profile.json", "state.sqlite", "state.sqlite-wal", "state.sqlite-shm", "memory.md", "soul.md", "skill-selections.json", "skills", "services", "repositories", "mounts", "files", "history", "chats"]);
 export const publicDocument = (path: string) => ["MEMORY.md", "SOUL.md"].includes(path) || path.startsWith("skills/");
 export function documentPath(input: string) {
@@ -292,19 +294,23 @@ export class ProfileFileStore {
           const file = this.resolve(state, path, false);
           if (!file || file.hidden) throw new FileError("not_found", "File unavailable", path);
           this.assertActive(await this.state(), file.path);
-          const bytes = await this.backend.read(file);
+          const bytes = await this.readWhole(file);
           signal?.throwIfAborted();
           return file.binary ? bytes : new TextDecoder("utf-8", { fatal: true }).decode(bytes);
         },
       };
     }, signal, [prefix]);
   }
+  private readWhole(file: ProfileFileRecord) {
+    if (file.size > wholeFileBytes) throw new FileError("not_supported", "File is larger than 32 MiB and can only be read in ranges", file.path);
+    return this.backend.read(file);
+  }
   read(input: string, reference = false): Promise<string | Uint8Array> {
     return this.serialize(async () => {
       const file = this.resolve(await this.state(), input, reference);
       if (!file || (!reference && file.hidden)) throw new FileError("not_found", "File unavailable", input);
       this.assertActive(await this.state(), file.path);
-      const bytes = await this.backend.read(file);
+      const bytes = await this.readWhole(file);
       return file.binary ? bytes : new TextDecoder("utf-8", { fatal: true }).decode(bytes);
     }, undefined, [input], reference);
   }
@@ -324,7 +330,7 @@ export class ProfileFileStore {
     const existing = Object.values(state.files).find(file => file.path === path);
     if (existing?.hidden) throw new FileError("permission_denied", "Private blobs are not editable", path);
     if (expected !== undefined && existing?.binary) throw new FileError("not_supported", "Exact edits require a text file", path);
-    if (expected !== undefined && (!existing || new TextDecoder("utf-8", { fatal: true }).decode(await this.backend.read(existing)) !== expected)) throw new FileError("invalid", "File changed after reading; read again before editing", path);
+    if (expected !== undefined && (!existing || new TextDecoder("utf-8", { fatal: true }).decode(await this.readWhole(existing)) !== expected)) throw new FileError("invalid", "File changed after reading; read again before editing", path);
     const bytes = typeof content === "string" ? new TextEncoder().encode(content) : content;
     if (bytes.length > (typeof content === "string" ? path === "MEMORY.md" ? 512 * 1024 : 200 * 1024 : 32 * 1024 * 1024)) throw new FileError("invalid", "File exceeds size limit", path);
     const directories = this.parents(state, path, true);
@@ -351,7 +357,7 @@ export class ProfileFileStore {
   writeStaged(input: string, staged: FileRecord) {
     const path = workingFilePath(input), frozen = { ...staged };
     if (managed(path)) throw new FileError("permission_denied", "Conversation directories are managed", path);
-    if (!/^(staging|\.files)\/\.stage-[0-9a-f-]{36}$/i.test(frozen.path) || !Number.isSafeInteger(frozen.size) || frozen.size < 0 || frozen.size > 32 * 1024 * 1024 || !/^[a-f0-9]{64}$/.test(frozen.sha256)) throw new FileError("invalid", "Invalid staged file", path);
+    if (!/^(staging|\.files)\/\.stage-[0-9a-f-]{36}$/i.test(frozen.path) || !Number.isSafeInteger(frozen.size) || frozen.size < 0 || frozen.size > storedFileBytes || !/^[a-f0-9]{64}$/.test(frozen.sha256)) throw new FileError("invalid", "Invalid staged file", path);
     return this.serialize(async () => {
       const state = await this.state();
       this.assertActive(state, path);
@@ -373,7 +379,7 @@ export class ProfileFileStore {
       const file = this.resolve(await this.state(), path, false);
       if (file) {
         if (file.binary) throw new FileError("invalid", "Existing Profile document is not UTF-8 text", path);
-        return { content: new TextDecoder("utf-8", { fatal: true }).decode(await this.backend.read(file)) };
+        return { content: new TextDecoder("utf-8", { fatal: true }).decode(await this.readWhole(file)) };
       }
       await this.writeLocked(path, text);
       return { content: text };
@@ -407,7 +413,7 @@ export class ProfileFileStore {
     return this.serialize(async () => {
       const file = this.resolve(await this.state(), path, false);
       if (!file || file.hidden || file.binary) throw new FileError("invalid", "Edit requires an existing text file", path);
-      const source = new TextDecoder("utf-8", { fatal: true }).decode(await this.backend.read(file));
+      const source = new TextDecoder("utf-8", { fatal: true }).decode(await this.readWhole(file));
       const ranges = edits.map(edit => {
         const start = source.indexOf(edit.oldText);
         if (!edit.oldText || start < 0 || source.indexOf(edit.oldText, start + 1) >= 0) throw new FileError("invalid", "Edit must match exactly once", path);
@@ -496,7 +502,7 @@ export class ProfileFileStore {
       if (this.findPath(state, target)) throw new FileError("invalid", "Destination already exists", target);
       const file = Object.values(state.files).find(file => file.path === source);
       if (file && !file.hidden) {
-        const bytes = await this.backend.read(file);
+        const bytes = await this.readWhole(file);
         return this.writeLocked(target, file.binary ? bytes : new TextDecoder("utf-8", { fatal: true }).decode(bytes));
       }
       if (!state.directories.includes(source)) throw new FileError("not_found", "Source not found", source);
@@ -506,7 +512,7 @@ export class ProfileFileStore {
         ...state.directories.filter(path => beneath(path, source)).map(path => target + path.slice(source.length)).sort((a, b) => a.length - b.length)];
       const files = { ...state.files }, operations: FileMutation[] = directories.map(path => ({ op: "mkdir", path }));
       for (const file of copied) {
-        const path = target + file.path.slice(source.length), staged = await this.backend.stage(await this.backend.read(file)), id = await this.identifier(path);
+        const path = target + file.path.slice(source.length), staged = await this.backend.stage(await this.readWhole(file)), id = await this.identifier(path);
         files[id] = { ...staged, id, path, binary: file.binary, saved: false, mtime: Date.now(), owner: owner(path) };
         operations.push({ op: "replace", path, source: staged.path, size: staged.size, sha256: staged.sha256, previous: null });
       }

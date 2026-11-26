@@ -31,8 +31,7 @@ nonisolated enum SharedNoteInbox {
         for payload in payloads {
             do {
                 let file = try await Task.detached(priority: .userInitiated) {
-                    let draft = try FileImporter.dataDraft(Data(contentsOf: payload.file), suggestedName: payload.file.lastPathComponent)
-                    return try FileImporter.stage(draft)
+                    try FileImporter.stage(fileAt: payload.file)
                 }.value
                 files.append((file, payload.directory))
             } catch {

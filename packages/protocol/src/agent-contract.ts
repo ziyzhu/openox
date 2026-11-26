@@ -3,7 +3,7 @@ import { PUSH_TOKEN_PATTERN, PushEnvironment, PushKind } from "./push.ts";
 
 export const AGENT_PROTOCOL_VERSION = 1;
 export const AGENT_DEFAULT_PORT = 9878;
-export const AGENT_FILE_BYTES = 32 * 1024 * 1024;
+export const AGENT_FILE_BYTES = 2 * 1024 * 1024 * 1024;
 export const AGENT_FILE_CHUNK_BYTES = 4 * 1024 * 1024;
 const AGENT_FILE_CHUNK_BASE64 = Math.ceil(AGENT_FILE_CHUNK_BYTES / 3) * 4;
 

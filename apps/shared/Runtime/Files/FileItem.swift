@@ -210,6 +210,7 @@ nonisolated public enum FileLimits {
     public static let textBytes = 200 * 1024
     public static let pdfBytes = 32 * 1024 * 1024
     public static let fileBytes = 32 * 1024 * 1024
+    public static let storedBytes = 2 * 1024 * 1024 * 1024
     public static let imagePixels = 40_000_000
     public static let imageMaxDimension: CGFloat = 1568
     public static let imageJPEGQuality: CGFloat = 0.85

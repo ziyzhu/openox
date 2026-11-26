@@ -51,7 +51,7 @@ extension ProfileRepository {
             throw CocoaError(.fileReadCorruptFile)
         }
         let files = try JSONDecoder().decode([DurableProfileFile].self, from: JSONEncoder().encode(JSONValue.array(values)))
-        guard files.allSatisfy({ $0.path.hasPrefix(prefix) && $0.size >= 0 && $0.size <= FileLimits.fileBytes && $0.mtime.isFinite && $0.mtime >= 0 }),
+        guard files.allSatisfy({ $0.path.hasPrefix(prefix) && $0.size >= 0 && $0.size <= FileLimits.storedBytes && $0.mtime.isFinite && $0.mtime >= 0 }),
               nextValue.stringValue == nil || (nextValue.stringValue == files.last?.path && nextValue.stringValue != cursor) else {
             throw CocoaError(.fileReadCorruptFile)
         }
@@ -84,7 +84,7 @@ extension ProfileRepository {
             for (name, value) in zip(batch, values) where value != .null {
                 let record = try JSONDecoder().decode(DurableFileRecord.self, from: JSONEncoder().encode(value))
                 guard record.reference == name || record.aliases?.contains(name) == true,
-                      record.hidden != true, record.size >= 0, record.size <= (record.binary ? FileLimits.fileBytes : FileLimits.textBytes),
+                      record.hidden != true, record.size >= 0, record.size <= (record.binary ? FileLimits.storedBytes : FileLimits.textBytes),
                       record.sha256.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else { throw CocoaError(.fileReadCorruptFile) }
                 let file = record.file(in: scope)
                 references[name] = file
@@ -117,16 +117,31 @@ extension ProfileRepository {
     }
 
     func importFile(data: Data, suggestedName: String, in scope: ProfileScope, conversation: DurableConversationReference? = nil) async throws -> FileItem {
-        if let conversation {
-            guard conversation.profileID == scope.profileID else { throw CocoaError(.fileReadNoPermission) }
-            let folder = "conversations/\(conversation.conversationID)"
-            let cleaned = FileStore.sanitizedFilename(suggestedName)
-            let files = try await profileFiles(prefix: folder + "/", in: scope)
-            let name = files.contains(where: { $0.path.caseInsensitiveCompare(folder + "/" + cleaned) == .orderedSame }) ? versionedFileName(cleaned) : cleaned
-            return try await writeFile(data: data, named: name, in: scope, conversation: conversation)
-        }
-        let name = try await availableFileName(suggestedName, in: scope)
-        return try await writeFile(data: data, named: name, in: scope)
+        let name = try await importName(suggestedName, in: scope, conversation: conversation)
+        return try await writeFile(data: data, named: name, in: scope, conversation: conversation)
+    }
+
+    func importFile(contentsOf url: URL, suggestedName: String, in scope: ProfileScope, conversation: DurableConversationReference? = nil) async throws -> FileItem {
+        let name = try profileFileName(try await importName(suggestedName, in: scope, conversation: conversation))
+        let path = try await filePath(named: name, in: scope, conversation: conversation)
+        try await DurableProfileStore.shared.writeFile(contentsOf: url, path: path, in: scope)
+        Log.app.info("ProfileRepository.file publish profile=\(scope.profileID?.uuidString ?? "temporary") file=\(name) streamed=true")
+        return try await self.file(named: path, in: scope)
+    }
+
+    private func importName(_ suggestedName: String, in scope: ProfileScope, conversation: DurableConversationReference?) async throws -> String {
+        guard let conversation else { return try await availableFileName(suggestedName, in: scope) }
+        guard conversation.profileID == scope.profileID else { throw CocoaError(.fileReadNoPermission) }
+        let folder = "conversations/\(conversation.conversationID)"
+        let cleaned = FileStore.sanitizedFilename(suggestedName)
+        let files = try await profileFiles(prefix: folder + "/", in: scope)
+        return files.contains(where: { $0.path.caseInsensitiveCompare(folder + "/" + cleaned) == .orderedSame }) ? versionedFileName(cleaned) : cleaned
+    }
+
+    private func filePath(named name: String, in scope: ProfileScope, conversation: DurableConversationReference?) async throws -> String {
+        guard let conversation else { return try await fileRecord(named: name, in: scope)?.path ?? "imports/" + name }
+        guard conversation.profileID == scope.profileID else { throw CocoaError(.fileReadNoPermission) }
+        return "conversations/\(conversation.conversationID)/" + name
     }
 
     func writeFile(data: Data, named name: String, in scope: ProfileScope, conversation: DurableConversationReference? = nil) async throws -> FileItem {
@@ -136,13 +151,7 @@ extension ProfileRepository {
         }
         let file = FileItem(fileName: name, directory: scope.root.appendingPathComponent("artifacts", isDirectory: true))
         let text = file.kind == .text || file.kind == .html ? try fileText(data) : nil
-        let path: String
-        if let conversation {
-            guard conversation.profileID == scope.profileID else { throw CocoaError(.fileReadNoPermission) }
-            path = "conversations/\(conversation.conversationID)/" + name
-        } else {
-            path = try await fileRecord(named: name, in: scope)?.path ?? "imports/" + name
-        }
+        let path = try await filePath(named: name, in: scope, conversation: conversation)
         if let text {
             _ = try await DurableProfileStore.shared.command(scope: scope, value: .object([
                 "action": .string("fileWrite"), "path": .string(path), "text": .string(text),
@@ -196,7 +205,7 @@ extension ProfileRepository {
         guard let value = result.objectValue?["file"] else { throw CocoaError(.fileReadCorruptFile) }
         if value == .null { return nil }
         let record = try JSONDecoder().decode(DurableFileRecord.self, from: JSONEncoder().encode(value))
-        guard record.hidden != true, record.path == path || record.reference == path || record.aliases?.contains(path) == true, record.size >= 0, record.size <= (record.binary ? FileLimits.fileBytes : FileLimits.textBytes),
+        guard record.hidden != true, record.path == path || record.reference == path || record.aliases?.contains(path) == true, record.size >= 0, record.size <= (record.binary ? FileLimits.storedBytes : FileLimits.textBytes),
               record.sha256.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else {
             throw CocoaError(.fileReadCorruptFile)
         }

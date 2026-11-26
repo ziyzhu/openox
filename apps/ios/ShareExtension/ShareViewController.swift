@@ -228,8 +228,13 @@ private struct SharedImportPayload {
 }
 
 private struct SharedFilePayload {
+    enum Content {
+        case data(Data)
+        case file(URL)
+    }
+
     let fileName: String
-    let data: Data
+    let content: Content
     let preview: String
 }
 
@@ -243,6 +248,7 @@ private enum SharedItemReader {
     private static let maximumItemCount = 10
     private static let maximumTextBytes = 200 * 1024
     private static let maximumMediaBytes = 32 * 1024 * 1024
+    private static let maximumMovieBytes = 2 * 1024 * 1024 * 1024
 
     static func read(_ inputItems: [Any]) async throws -> SharedImportPayload {
         var titles: [String] = []
@@ -279,7 +285,7 @@ private enum SharedItemReader {
             files.insert(
                 SharedFilePayload(
                     fileName: fileName(sanitizedTitle(title), defaultExtension: "md"),
-                    data: data,
+                    content: .data(data),
                     preview: textPreview(text)
                 ),
                 at: 0
@@ -296,6 +302,10 @@ private enum SharedItemReader {
     }
 
     private static func attachment(from provider: NSItemProvider, title: String?) async throws -> LoadedAttachment? {
+        if let movie = try await movie(from: provider) {
+            return .file(movie)
+        }
+
         if provider.hasItemConformingToTypeIdentifier(UTType.pdf.identifier),
            let data = await data(from: provider, identifier: UTType.pdf.identifier) {
             return .file(try payload(
@@ -335,7 +345,7 @@ private enum SharedItemReader {
                 }
                 return .link(SharedFilePayload(
                     fileName: fileName(name, defaultExtension: "md"),
-                    data: Data(urlString.utf8),
+                    content: .data(Data(urlString.utf8)),
                     preview: urlString
                 ))
             }
@@ -377,7 +387,46 @@ private enum SharedItemReader {
         return nil
     }
 
+    private static func movie(from provider: NSItemProvider) async throws -> SharedFilePayload? {
+        guard let identifier = provider.registeredTypeIdentifiers.first(where: { UTType($0)?.conforms(to: .movie) == true }) else { return nil }
+        let copy: URL? = await withCheckedContinuation { continuation in
+            _ = provider.loadFileRepresentation(forTypeIdentifier: identifier) { url, error in
+                guard let url else {
+                    ShareLog.logger.error("SharedItemReader.movieUnavailable type=\(identifier, privacy: .public) error=\(error?.localizedDescription ?? "none", privacy: .public)")
+                    continuation.resume(returning: nil)
+                    return
+                }
+                continuation.resume(returning: try? copiedFile(url))
+            }
+        }
+        guard let copy else { return nil }
+        return try moviePayload(copy, suggestedName: provider.suggestedName, type: UTType(identifier))
+    }
+
+    private static func copiedFile(_ url: URL) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let destination = directory.appendingPathComponent(url.lastPathComponent, isDirectory: false)
+        try FileManager.default.copyItem(at: url, to: destination)
+        return destination
+    }
+
+    private static func moviePayload(_ copy: URL, suggestedName: String?, type: UTType?) throws -> SharedFilePayload {
+        let size = try copy.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        guard size <= maximumMovieBytes else {
+            try? FileManager.default.removeItem(at: copy.deletingLastPathComponent())
+            throw SharedItemError.tooLarge
+        }
+        let name = fileName(suggestedName ?? copy.deletingPathExtension().lastPathComponent,
+                            defaultExtension: copy.pathExtension.isEmpty ? type?.preferredFilenameExtension ?? "mov" : copy.pathExtension)
+        ShareLog.logger.info("SharedItemReader.movie bytes=\(size)")
+        return SharedFilePayload(fileName: name, content: .file(copy), preview: name)
+    }
+
     private static func localFile(at url: URL, from provider: NSItemProvider) throws -> SharedFilePayload? {
+        if UTType(filenameExtension: url.pathExtension)?.conforms(to: .movie) == true {
+            return try moviePayload(try copiedFile(url), suggestedName: provider.suggestedName ?? url.lastPathComponent, type: nil)
+        }
         let type = UTType(filenameExtension: url.pathExtension)
             ?? provider.registeredTypeIdentifiers.compactMap(UTType.init).first(where: supportedFileType)
         guard let type, supportedFileType(type) else { return nil }
@@ -500,7 +549,7 @@ private enum SharedItemReader {
     ) throws -> SharedFilePayload {
         guard data.count <= maximumMediaBytes else { throw SharedItemError.tooLarge }
         let name = fileName(suggestedName ?? fallbackName, defaultExtension: defaultExtension)
-        return SharedFilePayload(fileName: name, data: data, preview: preview ?? name)
+        return SharedFilePayload(fileName: name, content: .data(data), preview: preview ?? name)
     }
 
     private static func data(from provider: NSItemProvider, identifier: String) async -> Data? {
@@ -596,7 +645,13 @@ private enum SharedItemWriter {
             try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
             do {
                 let destination = staging.appendingPathComponent(file.fileName, isDirectory: false)
-                try file.data.write(to: destination, options: [.atomic, .completeFileProtectionUnlessOpen])
+                switch file.content {
+                case .data(let data):
+                    try data.write(to: destination, options: [.atomic, .completeFileProtectionUnlessOpen])
+                case .file(let source):
+                    try FileManager.default.moveItem(at: source, to: destination)
+                    try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUnlessOpen], ofItemAtPath: destination.path)
+                }
                 try FileManager.default.moveItem(at: staging, to: pending)
             } catch {
                 try? FileManager.default.removeItem(at: staging)

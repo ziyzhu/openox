@@ -559,7 +559,7 @@ struct ConversationPage: View {
             isPresented: isPresenting(.photos),
             selection: $photoPickerItems,
             maxSelectionCount: 10,
-            matching: .images
+            matching: .any(of: [.images, .videos])
         )
         .onChange(of: photoPickerItems) { _, items in
             guard !items.isEmpty else { return }
@@ -569,7 +569,7 @@ struct ConversationPage: View {
         }
         .fileImporter(
             isPresented: isPresenting(.files),
-            allowedContentTypes: [.pdf, .image, .plainText, .sourceCode, .json, .commaSeparatedText],
+            allowedContentTypes: [.pdf, .image, .movie, .plainText, .sourceCode, .json, .commaSeparatedText],
             allowsMultipleSelection: true
         ) { result in
             switch result {
@@ -1814,9 +1814,13 @@ struct ConversationPage: View {
     }
 
     private func importAttachment(named name: String, source: String, operation: @escaping @Sendable () async throws -> FileImporter.Draft) {
+        importStagedAttachment(named: name, source: source) { try FileImporter.stage(try await operation()) }
+    }
+
+    private func importStagedAttachment(named name: String, source: String, operation: @escaping @Sendable () async throws -> FileImporter.StagedFile) {
         composer.importAttachment(named: name, operation: {
             try await Task.detached(priority: .userInitiated) {
-                try FileImporter.stage(try await operation())
+                try await operation()
             }.value
         }) { error in
             Log.ui.error("ConversationPage.attach \(source) error=\(error.localizedDescription)")
@@ -1826,6 +1830,13 @@ struct ConversationPage: View {
 
     private func ingestPhotoItems(_ items: [PhotosPickerItem]) {
         for item in items {
+            if item.supportedContentTypes.contains(where: { $0.conforms(to: .movie) }) {
+                importStagedAttachment(named: "Video", source: "video") {
+                    guard let movie = try await item.loadTransferable(type: PickedMovie.self) else { throw FileError.unsupportedType("Video") }
+                    return movie.staged
+                }
+                continue
+            }
             let suggested = item.itemIdentifier.map { "Photo-\($0.prefix(6)).jpg" } ?? "Photo.jpg"
             importAttachment(named: suggested, source: "photo") {
                 guard let data = try await item.loadTransferable(type: Data.self) else {
@@ -1857,10 +1868,10 @@ struct ConversationPage: View {
 
     private func ingestFileURLs(_ urls: [URL]) {
         for url in urls {
-            importAttachment(named: url.lastPathComponent, source: "file") {
+            importStagedAttachment(named: url.lastPathComponent, source: "file") {
                 let scoped = url.startAccessingSecurityScopedResource()
                 defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                return try FileImporter.fileDraft(at: url)
+                return try FileImporter.stage(fileAt: url)
             }
         }
     }
@@ -1871,5 +1882,15 @@ struct ConversationPage: View {
 
     private func showAttachmentError(_ message: String) {
         toast = Toast(message: message, role: .error)
+    }
+}
+
+private struct PickedMovie: Transferable {
+    let staged: FileImporter.StagedFile
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(importedContentType: .movie) { received in
+            PickedMovie(staged: try FileImporter.stage(fileAt: received.file))
+        }
     }
 }

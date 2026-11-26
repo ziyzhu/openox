@@ -164,11 +164,20 @@ nonisolated enum DurableMessageCodec {
                 verified.append(.text(TextContent("[File unavailable: \(file.displayName)]")))
                 continue
             }
-            let data = try await reader.readFile(descriptor: descriptor)
-            let resolved = FileItem(fileName: file.fileName, directory: owner.root,
-                relativePath: descriptor.objectValue?["path"]?.stringValue ?? path,
-                virtualPath: descriptor.objectValue?["path"]?.stringValue.map { "/" + $0 }, size: data.count)
-            verified.append(.attachment(try inputs.snapshot(resolved, data: data)))
+            let storedPath = descriptor.objectValue?["path"]?.stringValue ?? path
+            var input: (data: Data, path: String)
+            if descriptor.objectValue?["size"]?.intValue ?? 0 > FileLimits.fileBytes {
+                guard let compressed = await VideoTransmission.modelInput(descriptor, reader: reader, name: file.displayName) else {
+                    verified.append(.text(TextContent("[Attachment too large to send to the model: \(file.displayName)]")))
+                    continue
+                }
+                input = (compressed.data, URL(fileURLWithPath: storedPath).deletingLastPathComponent().appendingPathComponent(compressed.name).relativePath)
+            } else {
+                input = (try await reader.readFile(descriptor: descriptor), storedPath)
+            }
+            let resolved = FileItem(fileName: file.fileName, directory: owner.root, relativePath: input.path,
+                virtualPath: "/" + storedPath, size: input.data.count)
+            verified.append(.attachment(try inputs.snapshot(resolved, data: input.data)))
         }
         return verified
     }

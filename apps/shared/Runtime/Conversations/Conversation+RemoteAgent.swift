@@ -255,8 +255,8 @@ extension Conversation {
                 case .attachment(let file):
                     if UTType(file.typeIdentifier)?.conforms(to: .image) == true, let data = try? Data(contentsOf: file.fileURL) {
                         images.append(.object(["data": .string(data.base64EncodedString()), "mimeType": .string(file.mimeType)]))
-                    } else if let path = await uploadRemote(file, client: client, conversationID: conversationID) {
-                        texts.append("[Attached file: \(file.userFacingName), copied to \(path)]")
+                    } else if let copy = await remoteCopyNote(file, client: client, conversationID: conversationID) {
+                        texts.append("[Attached file: \(file.userFacingName). \(copy)]")
                     } else {
                         texts.append("[Attached file: \(file.userFacingName)]")
                     }
@@ -436,8 +436,8 @@ extension Conversation {
                 content.append(Self.remoteText(text.text))
             case .attachment(let file):
                 let name = file.virtualPath ?? file.userFacingName
-                let path = await uploadRemote(file, client: client, conversationID: conversationID)
-                content.append(Self.remoteText(path.map { "[Ox file: \(name), copied to \($0)]" } ?? "[Ox file: \(name)]"))
+                let copy = await remoteCopyNote(file, client: client, conversationID: conversationID)
+                content.append(Self.remoteText(copy.map { "[Ox file: \(name). \($0)]" } ?? "[Ox file: \(name)]"))
             case .thinking, .toolCall:
                 continue
             }
@@ -446,7 +446,7 @@ extension Conversation {
             if attachment.kind == .image {
                 content.append(.object(["type": .string("image"), "data": .string(attachment.data.base64EncodedString()), "mimeType": .string(attachment.mimeType)]))
             } else if let path = await uploadRemote(attachment.data, name: attachment.displayName, client: client, conversationID: conversationID) {
-                content.append(Self.remoteText("[Ox file: \(attachment.displayName), copied to \(path)]"))
+                content.append(Self.remoteText("[Ox file: \(attachment.displayName). A copy is on this machine at \(path)]"))
             } else {
                 content.append(Self.remoteText("[Ox file: \(attachment.displayName) could not be copied to this machine]"))
             }
@@ -458,10 +458,21 @@ extension Conversation {
         .object(["type": .string("text"), "text": .string(text)])
     }
 
-    private func uploadRemote(_ file: FileItem, client: RemoteAgentClient, conversationID: String) async -> String? {
+    private func remoteCopyNote(_ file: FileItem, client: RemoteAgentClient, conversationID: String) async -> String? {
+        let transmitted = await VideoTransmission.prepare(file.fileURL, name: file.displayName)
+        defer { transmitted.discard() }
         do {
-            let data = try Data(contentsOf: file.fileURL)
-            return await uploadRemote(data, name: file.displayName, client: client, conversationID: conversationID)
+            let handle = try FileHandle(forReadingFrom: transmitted.url)
+            defer { try? handle.close() }
+            let size = Int(try handle.seekToEnd())
+            try handle.seek(toOffset: 0)
+            let path = await uploadRemote(size: size, name: transmitted.name, client: client, conversationID: conversationID) { count in
+                guard let data = try handle.read(upToCount: count), data.count == count else { throw CocoaError(.fileReadCorruptFile) }
+                return data
+            }
+            guard let path else { return nil }
+            guard case .compressed = transmitted.source else { return "A copy is on this machine at \(path)" }
+            return "A copy is on this machine at \(path) (compressed to 720p MP4)"
         } catch {
             Log.session.error("Conversation.remote upload unreadable id=\(id) file=\(file.fileName) error=\(error.localizedDescription)")
             return nil
@@ -469,25 +480,34 @@ extension Conversation {
     }
 
     private func uploadRemote(_ data: Data, name: String, client: RemoteAgentClient, conversationID: String) async -> String? {
+        var offset = 0
+        return await uploadRemote(size: data.count, name: name, client: client, conversationID: conversationID) { count in
+            defer { offset += count }
+            return data[offset..<offset + count]
+        }
+    }
+
+    private func uploadRemote(size: Int, name: String, client: RemoteAgentClient, conversationID: String,
+                              next: (Int) throws -> Data) async -> String? {
         let startedAt = ContinuousClock.now
         let chunkBytes = 4 * 1024 * 1024
         var offset = 0
         do {
             repeat {
-                let end = min(offset + chunkBytes, data.count)
+                let count = min(chunkBytes, size - offset)
                 let written = try await client.call("files.write", .object([
                     "id": .string(conversationID), "name": .string(FileStore.sanitizedFilename(name)),
-                    "size": .int(data.count), "offset": .int(offset), "data": .string(data[offset..<end].base64EncodedString()),
+                    "size": .int(size), "offset": .int(offset), "data": .string(try next(count).base64EncodedString()),
                 ]))
-                offset = end
+                offset += count
                 if let path = written.objectValue?["path"]?.stringValue {
-                    Log.session.info("Conversation.remote upload id=\(id) bytes=\(data.count) durationMs=\(TurnLatencyTrace.milliseconds(startedAt.duration(to: .now)))")
+                    Log.session.info("Conversation.remote upload id=\(id) bytes=\(size) durationMs=\(TurnLatencyTrace.milliseconds(startedAt.duration(to: .now)))")
                     return path
                 }
-            } while offset < data.count
-            Log.session.error("Conversation.remote upload incomplete id=\(id) bytes=\(data.count)")
+            } while offset < size
+            Log.session.error("Conversation.remote upload incomplete id=\(id) bytes=\(size)")
         } catch {
-            Log.session.error("Conversation.remote upload failed id=\(id) bytes=\(data.count) offset=\(offset) error=\(LogPrivacy.text(error.localizedDescription, limit: 200))")
+            Log.session.error("Conversation.remote upload failed id=\(id) bytes=\(size) offset=\(offset) error=\(LogPrivacy.text(error.localizedDescription, limit: 200))")
         }
         return nil
     }

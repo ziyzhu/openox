@@ -145,7 +145,7 @@ nonisolated final class DurableFileDirectory {
                     defer { Darwin.close(fd) }
                     directories.append(path)
                     try visit(fd, path)
-                } else if info.st_mode & S_IFMT == S_IFREG, info.st_nlink == 1, (0...32 * 1024 * 1024).contains(info.st_size) {
+                } else if info.st_mode & S_IFMT == S_IFREG, info.st_nlink == 1, (0...Int64(FileLimits.storedBytes)).contains(info.st_size) {
                     let stamp = "\(info.st_mtimespec.tv_sec):\(info.st_mtimespec.tv_nsec):\(info.st_ctimespec.tv_sec):\(info.st_ctimespec.tv_nsec):\(info.st_size)"
                     let textLimit = path == "MEMORY.md" ? 512 * 1024 : 200 * 1024
                     let mtime = Double(info.st_mtimespec.tv_sec) * 1000 + Double(info.st_mtimespec.tv_nsec) / 1_000_000
@@ -299,7 +299,7 @@ nonisolated final class DurableFileDirectory {
                 }
             case "replace", "move":
                 guard let source = operation["source"] as? String, let size = operation["size"] as? Int,
-                      let digest = operation["sha256"] as? String, (0...32 * 1024 * 1024).contains(size),
+                      let digest = operation["sha256"] as? String, (0...FileLimits.storedBytes).contains(size),
                       digest.count == 64, digest.allSatisfy({ "0123456789abcdef".contains($0) }),
                       op != "replace" || source.hasPrefix("staging/.stage-") || source.hasPrefix(".files/.stage-") || source.hasPrefix("artifacts/.stage-") else { throw failure("Invalid file mutation", code: EINVAL) }
                 let sourceDirectory: Int32, sourceName: String

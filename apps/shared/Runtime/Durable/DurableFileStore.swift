@@ -114,7 +114,7 @@ nonisolated final class DurableFileStore {
             return NSNull()
         case "filesOpen":
             guard handles.count < 4, let path = params["path"] as? String, let size = params["size"] as? Int,
-                  (0...32 * 1024 * 1024).contains(size) else { throw failure("Invalid file read") }
+                  (0...FileLimits.storedBytes).contains(size) else { throw failure("Invalid file read") }
             let source = payloadPath(path)
             let fd = try (source == nil ? publicFiles : privateFiles).openFile(source ?? path)
             try checkSize(fd, size: size)
@@ -149,7 +149,7 @@ nonisolated final class DurableFileStore {
                 try durable(fd); try durable(target)
                 return NSNull()
             }
-            guard handles.count < 4, let size = params["size"] as? Int, (0...32 * 1024 * 1024).contains(size) else { throw failure("File size or transfer limit exceeded") }
+            guard handles.count < 4, let size = params["size"] as? Int, (0...FileLimits.storedBytes).contains(size) else { throw failure("File size or transfer limit exceeded") }
             let token = UUID().uuidString
             if op == "begin" || isPrivate {
                 let stage = ".write-\(token)"
