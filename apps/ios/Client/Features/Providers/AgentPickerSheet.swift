@@ -119,19 +119,24 @@ struct RemoteAgentModelPicker<Header: View>: View {
                     .settingsContentInset()
                 header()
                 VStack(spacing: 0) {
-                    Menu {
-                        ForEach(models) { model in
-                            Button { conversation.selectRemoteModel(model) } label: {
-                                Label { Text(verbatim: model.name); Text(verbatim: model.reference.provider) } icon: {
-                                    if selected == model.reference { Image(systemName: "checkmark") }
-                                }
-                            }
-                        }
+                    NavigationLink {
+                        SettingsSelectionPickerView(
+                            title: "Model",
+                            options: models.map { model in
+                                SettingsSelectionOption(id: model.id, value: model.id, title: model.name, subtitle: model.reference.provider,
+                                                        accessibilityIdentifier: A11yID.ConversationControls.modelOption(model.id))
+                            },
+                            selection: Binding(
+                                get: { selected.map { "\($0.provider)/\($0.id)" } ?? "" },
+                                set: { id in if let model = models.first(where: { $0.id == id }) { conversation.selectRemoteModel(model) } }
+                            ),
+                            searchAccessibilityIdentifier: A11yID.ConversationControls.modelSearch
+                        )
                     } label: {
                         SettingsDisclosureRow(title: "Model", value: Text(verbatim: conversation.remoteModelName ?? String(localized: "Agent default")),
-                                              isLoading: agents.statuses[endpoint] == .checking && models.isEmpty,
-                                              indicator: "chevron.up.chevron.down")
+                                              isLoading: agents.statuses[endpoint] == .checking && models.isEmpty)
                     }
+                    .buttonStyle(.plain)
                     .disabled(models.isEmpty)
                     .accessibilityIdentifier(A11yID.ConversationControls.agentModelMenu)
                 }
