@@ -31,7 +31,7 @@ does not establish physical-device or cross-runtime portability.
   Stop on a differing credential; replacement requires separate confirmation. Import
   with `SecItemAdd`, preserve the app's accessibility setting, and read back to verify
   equality without printing values. Do not modify the source entry.
-- Restart the destination app with its intended Host launch environment to clear
+- Restart the destination app with its intended launch environment to clear
   cached signed-out state. Confirm ChatGPT reports `authenticated`; with authorization
   for a real model call, run a bounded `ox conversation send` smoke check. Remove the
   helpers and release reservations afterward. `sim:bootstrap` and template

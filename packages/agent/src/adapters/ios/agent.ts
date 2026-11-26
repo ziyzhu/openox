@@ -22,7 +22,7 @@ import { fileRequest, nativeFiles } from "./files";
 import { composeIOSPrompt } from "./prompts";
 import { composeContext, conversationSections } from "./context";
 import type { SystemPromptInput, TurnState } from "../../core/prompts";
-import { activeHost, sameScope, type HostScope } from "../../core/host-context";
+import { activeDevice, sameScope, type DeviceScope } from "../../core/device-context";
 import { decodeBase64, encodeBase64 } from "../../core/base64";
 
 import { readSchedules, replaceSchedules, importSchedules, recoverScheduledRuns } from "../../profile/schedules";
@@ -89,7 +89,7 @@ interface NativeConfiguration {
   thinkingLevel: ModelThinkingLevel;
   nativeProviderID?: string;
   nativeReasoningEffort?: string;
-  scope?: HostScope;
+  scope?: DeviceScope;
 }
 type NativeAttachment = (
   | { status: "attaching" }
@@ -242,10 +242,10 @@ export class IOSAgentAdapter {
       case "run":
       case "continue": {
         const target = attached();
-        if (args.turnState?.hostContext) {
+        if (args.turnState?.deviceContext) {
           const attachment = this.attachments.get(target.conversationID);
           const expected = attachment?.status === "attached" ? attachment.configuration.scope : undefined;
-          if (!expected || !sameScope(expected, activeHost(args.turnState.hostContext))) throw new Error("Turn state does not belong to the attached host/Profile scope");
+          if (!expected || !sameScope(expected, activeDevice(args.turnState.deviceContext))) throw new Error("Turn state does not belong to the attached device/Profile scope");
         }
         await this.guardProgress(target);
         const turnState = args.turnState;
@@ -738,7 +738,7 @@ export class IOSAgentAdapter {
       await session.observe(reference);
       const saved = (await session.harness.snapshot(ConversationApplicationMetadata, conversation.id, context))?.fields;
       this.attachments.set(conversation.id, { status: "attached", configuration: { provider: alias, modelId: config.model,
-        scope: config.promptState.hostContext ? { ...config.promptState.hostContext.active } : undefined,
+        scope: config.promptState.deviceContext ? { ...config.promptState.deviceContext.active } : undefined,
         thinkingLevel: config.thinkingLevel === undefined ? metadata.agent?.thinkingLevel ?? "off" : config.thinkingLevel ?? "off",
         nativeProviderID: config.providerID ?? (typeof saved?.nativeProviderID === "string" ? saved.nativeProviderID : undefined),
         nativeReasoningEffort: config.nativeReasoningEffort === undefined ? typeof saved?.nativeReasoningEffort === "string" ? saved.nativeReasoningEffort : undefined : config.nativeReasoningEffort ?? undefined } });

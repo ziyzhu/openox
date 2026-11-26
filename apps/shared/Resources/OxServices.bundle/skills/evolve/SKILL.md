@@ -17,7 +17,7 @@ Load only needed references; paths are relative to this skill directory.
 | --- | --- |
 | Configure, connect, refresh, audit, restore, or repair providers/models | `references/providers.md` |
 | Build, repair, or substantively verify web handlers | `references/web-service.md` |
-| Connect or repair direct HTTP APIs with Host-managed authentication | `references/api-service.md` |
+| Connect or repair direct HTTP APIs with Ox-managed authentication | `references/api-service.md` |
 | Create, improve, copy, share, or verify reusable skills | `references/skills.md` |
 | Add or repair website conversation Actions | Web service reference, then `references/model-service.md` |
 | Add or standardize default website search | Web service reference, then `references/search.md` |

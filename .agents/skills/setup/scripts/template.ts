@@ -177,7 +177,7 @@ export async function launchTemplate(args = Bun.argv.slice(2), build = true): Pr
     const descriptor = await open(join(control, "input.json"), "wx", 0o600);
     try { await descriptor.writeFile(JSON.stringify(prepared)); } finally { await descriptor.close(); }
     await run(["xcrun", "simctl", "launch", "--terminate-running-process", await ios.udid(), bundle], {
-      capture: true, env: { SIMCTL_CHILD_OX_DEVICE_TEMPLATE: runID, SIMCTL_CHILD_OX_DEBUG_ENDPOINT: config.debugEndpoint, SIMCTL_CHILD_OX_HOST_LOOPBACK: values.loopback ? "1" : "0" },
+      capture: true, env: { SIMCTL_CHILD_OX_DEVICE_TEMPLATE: runID, SIMCTL_CHILD_OX_DEBUG_ENDPOINT: config.debugEndpoint, SIMCTL_CHILD_OX_PROFILE_LOOPBACK: values.loopback ? "1" : "0" },
     });
     launched = true;
     const deadline = Date.now() + 60_000;

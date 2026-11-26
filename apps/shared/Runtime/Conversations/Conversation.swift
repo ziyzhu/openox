@@ -1940,7 +1940,7 @@ final class Conversation: Identifiable {
             isTemporary: retention == .temporary,
             responseLanguage: AppLocale.shared.responseLanguage,
             children: conversationManager?.children(of: self) ?? [],
-            hostID: Device.hostID,
+            deviceID: Device.qualifiedID,
             profileID: scope.profileID?.uuidString ?? "temporary:\(scope.generation.uuidString)"
         )
     }

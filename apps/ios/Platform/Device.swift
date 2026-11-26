@@ -10,7 +10,7 @@ enum Device {
         #endif
     }
     static let id = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
-    static var hostID: String { "ios:\(id)" }
+    static var qualifiedID: String { "ios:\(id)" }
     @MainActor static var name: String { UIDevice.current.name }
 
     static let internalIDs: Set<String> = [

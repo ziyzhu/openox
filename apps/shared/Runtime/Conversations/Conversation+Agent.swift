@@ -6,7 +6,7 @@ extension Conversation {
         return AgentConfiguration(
             client: client,
             model: model,
-            promptState: ConversationPromptState.system(memory: systemPromptMemory, hostID: Device.hostID, profileID: scope.profileID?.uuidString ?? "temporary:\(scope.generation.uuidString)"),
+            promptState: ConversationPromptState.system(memory: systemPromptMemory, deviceID: Device.qualifiedID, profileID: scope.profileID?.uuidString ?? "temporary:\(scope.generation.uuidString)"),
             tools: [ConversationTool(conversation: self)],
             streamOptions: StreamOptions(sessionID: conversationID.uuidString),
             transformContext: { request in

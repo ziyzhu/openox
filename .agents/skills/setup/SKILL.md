@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Set up OpenOx for CLI, macOS Host, or iOS development. Use for dependencies, simulator provisioning, signing, bundled services, first launch, contribution preparation, or setup troubleshooting.
+description: Set up OpenOx for CLI, macOS app, or iOS development. Use for dependencies, simulator provisioning, signing, bundled services, first launch, contribution preparation, or setup troubleshooting.
 ---
 
 # Setup
@@ -20,12 +20,12 @@ Inspect existing tools and configuration first. Preserve the contributor’s dev
 ```sh
 (cd apps/cli && bun run build && bun link)
 ox --help
-ox host list --help
+ox profile discover --help
 ```
 
 Link from `apps/cli`, not the workspace root. If `ox` is missing or shows stale commands, inspect `command -v ox` and resolve the PATH or existing install without overwriting unrelated executables. A source link follows one checkout; to run the CLI from a different checkout, use `bun apps/cli/src/ox.ts` there. For a standalone install, see `apps/cli/install.sh`.
 
-## macOS Host
+## macOS app
 
 Use macOS 26+, Xcode, and XcodeGen 2.46+ (`brew install xcodegen`).
 
@@ -37,7 +37,7 @@ bun run build:macos -derivedDataPath "$DERIVED_DATA"
 "$DERIVED_DATA/Build/Products/Debug/Ox.app/Contents/MacOS/Ox"
 ```
 
-Stop an existing Host before launching another. Verify its status in the menu bar; the Host has no chat UI. Use `--allow-connections` to enable remote access and `--disable-connections` to turn it off. Normal connections require Tailscale; `OX_HOST_ENDPOINT` selects the port, not the interface. For Debug-only local verification, launch with `OX_HOST_LOOPBACK=1 OX_HOST_ENDPOINT=ws://127.0.0.1:19876`. Do not reuse an iOS container for the Mac Host.
+Stop an existing Mac app before launching another. Verify its status in the menu bar; Ox has no chat UI. Use `--allow-connections` to enable remote access and `--disable-connections` to turn it off. Normal connections require Tailscale; `OX_PROFILE_ENDPOINT` selects the port, not the interface. For Debug-only local verification, launch with `OX_PROFILE_LOOPBACK=1 OX_PROFILE_ENDPOINT=ws://127.0.0.1:19876`. Do not reuse an iOS container for the Mac app.
 
 ## Build and run on an iPhone
 

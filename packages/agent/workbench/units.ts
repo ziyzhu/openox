@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { oxScaffold, composeOxPrompt } from "../src/core/ox-prompts";
 import { composeTurnSections, filesSection, responseDirective, renderSections, type TurnState } from "../src/core/prompts";
-import { hostContextText, type HostContext, type PromptHost } from "../src/core/host-context";
+import { deviceContextText, type DeviceContext, type PromptDevice } from "../src/core/device-context";
 import { executeGuidance, countWords } from "../src/core/tool-prompts";
 import { guidanceTexts } from "../src/core/guidance-texts";
 import { functionGuidance } from "../src/functions/guidance";
@@ -116,25 +116,25 @@ function files(variant: Variant) {
   return filesSection(sampleRoot, variant.folders ? [{ path: "mounts/icloud-notes", name: "iCloud Drive › Notes" }] : [], "conversations/42/");
 }
 
-const iosScope = { hostID: "ios", profileID: "local" };
-const macHost: PromptHost = { hostID: "mac", profileID: "work", functions: ["ox"], serviceKinds: ["web", "api", "mcp"], presentation: "text", externalFiles: true };
+const iosScope = { deviceID: "ios", profileID: "local" };
+const macHost: PromptDevice = { deviceID: "mac", profileID: "work", functions: ["ox"], serviceKinds: ["web", "api", "mcp"], presentation: "text", externalFiles: true };
 
-function hostContext(variant: Variant): HostContext {
-  const host: PromptHost = { ...iosScope, functions: ["ox"], serviceKinds: ["web", "ios", "mcp"], presentation: variant.presentation, externalFiles: variant.storage !== "temporaryProfile" };
-  return { active: iosScope, hosts: variant.multiHost ? [host, macHost] : [host] };
+function deviceContext(variant: Variant): DeviceContext {
+  const host: PromptDevice = { ...iosScope, functions: ["ox"], serviceKinds: ["web", "ios", "mcp"], presentation: variant.presentation, externalFiles: variant.storage !== "temporaryProfile" };
+  return { active: iosScope, devices: variant.multiHost ? [host, macHost] : [host] };
 }
 
-function turnState(variant: Variant, context: HostContext): TurnState {
+function turnState(variant: Variant, context: DeviceContext): TurnState {
   return {
     skills: [...bundledSkills], skillConflicts: [],
     filePaths: variant.files ? ["conversations/42/photo.jpg", "reports/q3.pdf"] : [],
-    storageMode: variant.storage === "persisted" ? "persisted" : "temporary", responseLanguage: variant.language ? languageExample : null, hostContext: context,
+    storageMode: variant.storage === "persisted" ? "persisted" : "temporary", responseLanguage: variant.language ? languageExample : null, deviceContext: context,
   };
 }
 
 export function render(variant: Variant): Rendered {
-  const context = hostContext(variant);
-  const input = { memory: "(MEMORY.md contents)", hostContext: context };
+  const context = deviceContext(variant);
+  const input = { memory: "(MEMORY.md contents)", deviceContext: context };
   const base = composeOxPrompt(input, variant.isolated);
   const turn = composeTurnSections(turnState(variant, context), oxScaffold, context);
   const system = renderSections({ ...base.sections, ...turn, files: files(variant) });
@@ -155,7 +155,7 @@ export const defaultVariant: Variant = {
 
 function turnSections(patch: Partial<Variant>) {
   const variant = { ...defaultVariant, ...patch };
-  const context = hostContext(variant);
+  const context = deviceContext(variant);
   return composeTurnSections(turnState(variant, context), oxScaffold, context);
 }
 
@@ -167,10 +167,10 @@ function buildUnits(): Unit[] {
   const textReplies = turnSections({ presentation: "text" }).replies!;
   const temporary = turnSections({ storage: "temporary" }).storage!;
   const temporaryProfile = turnSections({ storage: "temporaryProfile" }).storage!;
-  const hostFooter = hostContextText(hostContext(defaultVariant)).split("\n").at(-1)!;
+  const deviceFooter = deviceContextText(deviceContext(defaultVariant)).split("\n").at(-1)!;
   const directive = responseDirective({ identifier: "{identifier}", name: "{name}" });
   const fillDirective = (text: string) => [text.replaceAll("{identifier}", languageExample.identifier).replaceAll("{name}", languageExample.name)];
-  const isolated = composeOxPrompt({ memory: "", hostContext: hostContext(defaultVariant) }, true).sections.durable_test_files!;
+  const isolated = composeOxPrompt({ memory: "", deviceContext: deviceContext(defaultVariant) }, true).sections.durable_test_files!;
   const units: Unit[] = [
     textUnit("identity.claude-subscription", "System", "Provider identity (Claude subscription)", locate(core("provider-prompts.ts"), "claude-subscription"), "system", providerIdentities["claude-subscription"]!),
     textUnit("preamble", "System", "Preamble", locate(core("ox-prompts.ts"), "preamble:"), "system", oxScaffold.preamble),
@@ -179,7 +179,7 @@ function buildUnits(): Unit[] {
     ...bundledSkills.map(skill => textUnit(`skill.${skill.name}`, "System · skill descriptions", skill.name,
       locate(join(agent, "skills", skill.name, "SKILL.md"), "description:"), "system", skill.description,
       text => [`<description>${escapeXml(normalized(text))}</description>`])),
-    textUnit("hosts.footer", "System · turn state", "Hosts footer", locate(core("host-context.ts"), hostFooter), "system", hostFooter),
+    textUnit("devices.footer", "System · turn state", "Devices footer", locate(core("device-context.ts"), deviceFooter), "system", deviceFooter),
     textUnit("replies.bubbles", "System · turn state", "Replies (conversation bubbles)", locate(prompts, "Replies render as Markdown"), "system", bubbles),
     textUnit("replies.text", "System · turn state", "Replies (text)", locate(prompts, "Replies render as text"), "system", textReplies),
     textUnit("files.none", "System · turn state", "No conversation files", locate(prompts, empty.conversation_files!), "system", empty.conversation_files!),

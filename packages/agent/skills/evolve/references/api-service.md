@@ -2,7 +2,7 @@
 
 `ox.web.search` orchestrates opted-in web services only. API search actions remain ordinary `ox.service.invoke` actions; naming an API action `search` does not add it to public search defaults.
 
-Follow Evolve's service authoring loop using published API documentation and verified responses. The Host executes handlers in an isolated JavaScript runtime and owns HTTP authentication. No website page, cookies, DOM, browser globals, or shell is available.
+Follow Evolve's service authoring loop using published API documentation and verified responses. Ox executes handlers in an isolated JavaScript runtime and owns HTTP authentication. No website page, cookies, DOM, browser globals, or shell is available.
 
 ## Contract
 
@@ -20,7 +20,7 @@ Authentication configurations:
 Authentication boundaries:
 
 - OAuth requires an existing public client registered as OpenOx and its application callback URI. If none is available, report that setup blocker rather than borrowing another app's client identity. Do not invent a working client ID, use a desktop loopback redirect for an iOS client, or put client secrets in source.
-- Authorization and token URLs must be HTTPS without credentials, query, or fragment. The Host opens the system login flow and refreshes tokens.
+- Authorization and token URLs must be HTTPS without credentials, query, or fragment. Ox opens the system login flow and refreshes tokens.
 - The user enters API keys, passwords, and bearer tokens through the service login interface; never request them in conversation, action inputs, or files.
 - Mark authenticated capabilities `requireAuth: true`; public capabilities can use false. An action with `requireAuth: false` never sends configured credentials, even after login. Private resources and account-scoped search therefore require `requireAuth: true`, even when the endpoint also permits anonymous public reads.
 - Use the standard `credentialStatus` and `configureCredentials` actions through `ox.service.invoke`; their full contracts are supplied upfront and both accept empty input.
@@ -45,11 +45,11 @@ window.ox.install(({ action, request }) => {
 });
 ```
 
-`request({ path, method?, query?, headers?, json? })` returns decoded JSON, or null for an empty successful response. The default method is GET. Paths resolve against `baseUrl` and must stay within its origin and path prefix. Use a trailing slash on `baseUrl`. Query values are URL-encoded; null values are omitted. Supply JSON bodies through `json`; the Host sets the content type. Other response formats are not supported.
+`request({ path, method?, query?, headers?, json? })` returns decoded JSON, or null for an empty successful response. The default method is GET. Paths resolve against `baseUrl` and must stay within its origin and path prefix. Use a trailing slash on `baseUrl`. Query values are URL-encoded; null values are omitted. Supply JSON bodies through `json`; Ox sets the content type. Other response formats are not supported.
 
-Use `headers` as an object of string values for non-secret metadata such as `headers: { "X-Device-Platform": "ios", "Accept": "application/vnd.example+json" }`. Names must be valid HTTP header names and unique ignoring case; values cannot contain control characters except horizontal tabs. The Host rejects authentication, cookie, content-type, routing, and transport headers: `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `Host`, `Content-Type`, `Content-Length`, `Transfer-Encoding`, `Connection`, `Keep-Alive`, `TE`, `Trailer`, `Upgrade`, `Proxy-Connection`, `Accept-Encoding`, `WWW-Authenticate`, and `Proxy-Authenticate`. The configured API-key header is also reserved, including for capabilities with `requireAuth: false`. Never put credentials or session tokens in custom headers; configure authentication through the service login interface.
+Use `headers` as an object of string values for non-secret metadata such as `headers: { "X-Device-Platform": "ios", "Accept": "application/vnd.example+json" }`. Names must be valid HTTP header names and unique ignoring case; values cannot contain control characters except horizontal tabs. Ox rejects authentication, cookie, content-type, routing, and transport headers: `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `Host`, `Content-Type`, `Content-Length`, `Transfer-Encoding`, `Connection`, `Keep-Alive`, `TE`, `Trailer`, `Upgrade`, `Proxy-Connection`, `Accept-Encoding`, `WWW-Authenticate`, and `Proxy-Authenticate`. The configured API-key header is also reserved, including for capabilities with `requireAuth: false`. Never put credentials or session tokens in custom headers; configure authentication through the service login interface.
 
-Declare approval for mutations. The Host rejects POST, PUT, PATCH, and DELETE from capabilities without `requireApproval: true`. It does not retry requests automatically or follow redirects. HTTP and decoding failures throw. Never blindly repeat a mutation after an uncertain result; inspect resulting state first.
+Declare approval for mutations. Ox rejects POST, PUT, PATCH, and DELETE from capabilities without `requireApproval: true`. It does not retry requests automatically or follow redirects. HTTP and decoding failures throw. Never blindly repeat a mutation after an uncertain result; inspect resulting state first.
 
 Install synchronously exactly once and register every declared action exactly once. Keep work inside handlers. The installer passes only `action` and `request`; put any text helpers directly in `actions.js` and use `console.log` for diagnostics. Return narrow results matching output schemas; use actual server pagination cursors. Tokens and authorization headers are unavailable to handlers.
 
@@ -58,8 +58,8 @@ Install synchronously exactly once and register every declared action exactly on
 1. Identify the API's domain from supplied documentation or public research through `ox.web.search` and official documentation. Check relevant manifests under `repositories/` using the glob `*/api/*/service.json` with targeted `ox.fs.find` lookups and reuse a suitable implementation. Missing source means author the needed service, not that the API is unavailable. Verify the base URL, operations, and authentication before authoring; never guess endpoints. For Google, use Google Discovery documents and googleworkspace/cli as request and workflow references.
 2. Identify bounded operations, permissions, pagination, and mutation effects. Reuse the user's approved scope; ask only about meaningful unresolved decisions. Author or repair only what the user requested or the task needs. Stop when the requested outcome is complete rather than adding an improvement pass.
 3. Author the manifest and handlers using the contract above. Before validation or inspection, read `references/service-icon.md`, preflight the product favicon, and set its verified `faviconUrl`. If no candidate passes, preserve the draft and stop before execution. Follow Evolve's validation/repair and source-selection steps, then inspect current contracts.
-4. When credentials need setup or recovery, follow `skills/authentication/SKILL.md` for `credentialStatus`, Host-managed `configureCredentials`, and access verification. Reuse valid existing configuration. Inspect contracts and invoke names such as `api:google-calendar:listCalendars`.
+4. When credentials need setup or recovery, follow `skills/authentication/SKILL.md` for `credentialStatus`, Ox-managed `configureCredentials`, and access verification. Reuse valid existing configuration. Inspect contracts and invoke names such as `api:google-calendar:listCalendars`.
 5. Verify successful reads, empty results, continuation, missing resources, and auth errors. Exercise mutations only with authorization. Report inaccessible or unverified capabilities explicitly.
 6. Review final source and evidence through Evolve's authoring loop. Report what improved, checks performed, and limitations; distinguish persisted drafts from verified capabilities.
 
-Credentials are stored separately in the Host's Keychain, bound to this service, repository, base URL, and auth configuration. Source and shared verification evidence must contain only public configuration and synthetic or sanitized examples.
+Credentials are stored separately in the device's Keychain, bound to this service, repository, base URL, and auth configuration. Source and shared verification evidence must contain only public configuration and synthetic or sanitized examples.

@@ -1,6 +1,6 @@
 ---
 name: build
-description: Build native apps and bundled services, regenerate schemas, and run static, type, packaging, generated-artifact and build-tool checks. Storage upgrades and live Host verification are separate; publication belongs to release.
+description: Build native apps and bundled services, regenerate schemas, and run static, type, packaging, generated-artifact and build-tool checks. Storage upgrades and live Profile verification are separate; publication belongs to release.
 ---
 
 # Build
@@ -21,7 +21,7 @@ live in `scripts/`; shared subprocess and generated-file helpers live in
 | `bun run ci --native-only` | Generate the agent bundle and build unsigned iOS and macOS apps. |
 | `bun run ci --ios-only` | Validate the native toolchain, install frozen dependencies, generate the agent, and build unsigned iOS only. |
 | `bun run ci --macos-only` | Validate the native toolchain, install frozen dependencies, generate the agent, and build unsigned macOS only. |
-| `bun run build:profile-schema` | Regenerate Host RPC JSON/Swift artifacts. |
+| `bun run build:profile-schema` | Regenerate Profile RPC JSON/Swift artifacts. |
 | `bun run build:repository-schema` | Regenerate repository JSON/Swift artifacts. |
 | `bun run build:provider-schema` | Regenerate provider definitions schema. |
 | `bun run build:services` | Rebuild bundled services and model-action resources. |
@@ -36,7 +36,7 @@ is not enough. Append xcodebuild arguments such as `-derivedDataPath <dir>` to e
 For changes confined to `apps/shared`, `build:macos` compiles the same shared sources without
 a Simulator; use it as the first compile check, then `build:ios` before iOS verification.
 
-`lint` validates public/private-content boundaries, iOS Client-Host layering,
+`lint` validates public/private-content boundaries, iOS Client-runtime layering,
 platform source ownership, unsafe absolute-path slicing, bundled skill packages and links,
 translations, provider models, and bundled service manifests/installers. It runs the explicit check list in `scripts/lint.ts`
 against the full repository, then checks TypeScript without generating or fixing files. Keep cross-file and resource checks here rather than forcing them into
@@ -70,12 +70,12 @@ files, and generates model-action resources. It mirrors `packages/agent/skills/`
 into `OxServices.bundle/skills/` for repository browsing and exports. Keep the
 manifest's skill names in sync and check in the regenerated mirror; the agent
 still loads the trusted packages from its own bundle. Package builds copy the repository source.
-Build and lint use the protocol package's manifest and installer validators; Ox runs the same validators from `PiDurable.bundle/service-validation.js` in JavaScriptCore. Keep contract rules there, not in parallel Swift validators. Native filesystem and network-policy checks remain in Swift. These checks are not live service verification. Bundled installers register handlers through `window.ox.install`; the Host runtime owns dispatch and error logging. Do not replace `window.ox` or retain a second dispatcher.
+Build and lint use the protocol package's manifest and installer validators; Ox runs the same validators from `PiDurable.bundle/service-validation.js` in JavaScriptCore. Keep contract rules there, not in parallel Swift validators. Native filesystem and network-policy checks remain in Swift. These checks are not live service verification. Bundled installers register handlers through `window.ox.install`; Ox runtime owns dispatch and error logging. Do not replace `window.ox` or retain a second dispatcher.
 Native targets default to MainActor with approachable concurrency. Use worker actors or `@concurrent` async helpers for CPU work and synchronous I/O; `nonisolated async` and inherited `Task` closures alone do not establish an off-main boundary. Publish observable state on MainActor after validating the captured scope or revision.
 Do not overwrite unrelated repository or generated changes.
 The iOS project uses synchronized source groups: adding or moving Swift files within included directories does not require XcodeGen regeneration.
-`PiDurable.bundle` and `ModelGuidance.generated.swift` are ignored build outputs: edit bundled packages in `packages/agent/skills/`, then run `build:agent` before native builds. The package exports normal System skill packages. Hosts receive a scoped `skillPackages` snapshot from the trusted runtime and resolve them through the normal skills catalog and filesystem. Skill activation loads workflow context; runtime permissions are independent of activation. The iOS Upload workflow installs the pinned Bun version and generates it before archiving; the target rejects missing or empty runtime resources. Verify the built `.app` when changing this packaging path. Follow the [iOS runtime dependency checks](../../../packages/agent/ios-runtime-dependencies.md) for dependency upgrades.
-The same build generates native filesystem contracts from `packages/agent/src/core/filesystem-contract.ts`, using pinned Pi read/write/edit schemas. Edit agent contracts and logic, not the generated Swift. Run `build:agent` before native compilation when changing function guidance or filesystem schemas; native compilation alone can reuse stale generated resources. Keep `packages/agent/src/functions/*/contracts.json` synchronized with a fresh Host's `ox vm functions --json`, including descriptions and required-field ordering. `execute` → `ox.fs.*` is the sole model filesystem surface; native backends retain source permissions, platform effects, and storage safety.
+`PiDurable.bundle` and `ModelGuidance.generated.swift` are ignored build outputs: edit bundled packages in `packages/agent/skills/`, then run `build:agent` before native builds. The package exports normal System skill packages. Ox receives a scoped `skillPackages` snapshot from the trusted runtime and resolve them through the normal skills catalog and filesystem. Skill activation loads workflow context; runtime permissions are independent of activation. The iOS Upload workflow installs the pinned Bun version and generates it before archiving; the target rejects missing or empty runtime resources. Verify the built `.app` when changing this packaging path. Follow the [iOS runtime dependency checks](../../../packages/agent/ios-runtime-dependencies.md) for dependency upgrades.
+The same build generates native filesystem contracts from `packages/agent/src/core/filesystem-contract.ts`, using pinned Pi read/write/edit schemas. Edit agent contracts and logic, not the generated Swift. Run `build:agent` before native compilation when changing function guidance or filesystem schemas; native compilation alone can reuse stale generated resources. Keep `packages/agent/src/functions/*/contracts.json` synchronized with a fresh Ox build's `ox vm functions --json`, including descriptions and required-field ordering. `execute` → `ox.fs.*` is the sole model filesystem surface; native backends retain source permissions, platform effects, and storage safety.
 All hosts share one core prompt. Put presentation facts in current turn context and detailed capability guidance in function help or matching skills; avoid capability-driven prose parsing or rendered-text patching.
 
 Run `bun run ci` after maintenance. `.bun-version` and `.github/ci.json` own shared

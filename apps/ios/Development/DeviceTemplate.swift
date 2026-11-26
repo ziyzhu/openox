@@ -10,10 +10,10 @@ enum DeviceTemplate {
             let whatsNewSeenVersion: String?
             let region: String?
             let defaultModel: JSONValue?
-            let allowHostConnections: Bool?
+            let allowConnections: Bool?
 
             private enum CodingKeys: String, CodingKey {
-                case language, onboardingCompleted, whatsNewSeenVersion, region, defaultModel, allowHostConnections
+                case language, onboardingCompleted, whatsNewSeenVersion, region, defaultModel, allowConnections
             }
 
             init(from decoder: Decoder) throws {
@@ -23,7 +23,7 @@ enum DeviceTemplate {
                 whatsNewSeenVersion = try values.decodeIfPresent(String.self, forKey: .whatsNewSeenVersion)
                 region = try values.decodeIfPresent(String.self, forKey: .region)
                 defaultModel = values.contains(.defaultModel) ? try values.decode(JSONValue.self, forKey: .defaultModel) : nil
-                allowHostConnections = try values.decodeIfPresent(Bool.self, forKey: .allowHostConnections)
+                allowConnections = try values.decodeIfPresent(Bool.self, forKey: .allowConnections)
             }
         }
         struct Defaults: Decodable {
@@ -149,7 +149,7 @@ enum DeviceTemplate {
                     try value.save()
                 }
                 if let region = settings.region, let value = LLMRegion(rawValue: region) { AppRegion.shared.setForTesting(value) }
-                if let enabled = settings.allowHostConnections {
+                if let enabled = settings.allowConnections {
                     var value = ConnectionSettings()
                     value.allowConnections = enabled
                     try value.save(to: AppStoragePaths.legacyHostConfiguration)
@@ -227,7 +227,7 @@ enum DeviceTemplate {
                 try await DurableProfileStore.shared.close(in: scope)
             }
             if let selection = request.selection, let profile = profiles[selection.profile] {
-                if let enabled = request.settings?.allowHostConnections {
+                if let enabled = request.settings?.allowConnections {
                     var value = ConnectionSettings()
                     value.allowConnections = enabled
                     try value.save(for: profile.id)

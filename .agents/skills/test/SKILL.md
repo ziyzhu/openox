@@ -1,6 +1,6 @@
 ---
 name: test
-description: "Verify storage backward compatibility, check agent behavior on a QA Host, and plan opt-in controlled benchmarks for task completion, latency and cost."
+description: "Verify storage backward compatibility, check agent behavior on a QA device, and plan opt-in controlled benchmarks for task completion, latency and cost."
 ---
 
 # Test
@@ -25,29 +25,29 @@ Missing predecessor artifacts block verification. Downgrade testing is opt-in.
 
 ## Targeted agent verification
 
-Use [Ox CLI](../ox-cli/SKILL.md) against an explicit reserved QA Host and a disposable
-Profile. Pick the provider and exact model ID from `ox host providers`. Use Mock
-for deterministic Host checks; real inference requires explicit authorization and
+Use [Ox CLI](../ox-cli/SKILL.md) against an explicit reserved QA device and a disposable
+Profile. Pick the provider and exact model ID from `ox profile providers`. Use Mock
+for deterministic Profile checks; real inference requires explicit authorization and
 a bounded run. Stage only synthetic data. For example, verify that an answer comes
 from a file rather than from the prompt:
 
 ```sh
-ox --host "$QA_HOST" conversation new --temporary --provider "$PROVIDER" --model "$MODEL" --json
+ox --profile "$QA_ENDPOINT" conversation new --temporary --provider "$PROVIDER" --model "$MODEL" --json
 ```
 
 Set `CONVERSATION` to the returned `conversationId`.
 
 ```sh
-ox --host "$QA_HOST" --conversation "$CONVERSATION" vm call ox.fs.write \
+ox --profile "$QA_ENDPOINT" --conversation "$CONVERSATION" vm call ox.fs.write \
   --args '{"purpose":"Seed QA fixture","path":"notes.txt","content":"Meeting code: MAPLE-739"}'
-ox --host "$QA_HOST" --conversation "$CONVERSATION" conversation send \
+ox --profile "$QA_ENDPOINT" --conversation "$CONVERSATION" conversation send \
   'Read notes.txt and tell me the meeting code.' --json
-ox --host "$QA_HOST" --conversation "$CONVERSATION" conversation inspect --messages --json
-ox --host "$QA_HOST" --conversation "$CONVERSATION" conversation logs --json
+ox --profile "$QA_ENDPOINT" --conversation "$CONVERSATION" conversation inspect --messages --json
+ox --profile "$QA_ENDPOINT" --conversation "$CONVERSATION" conversation logs --json
 ```
 
 Require a completed turn, the expected answer, and a successful `AgentCall.end`
-for `ox.fs.read` scoped to that turn. A CLI run exercises the real Host; it does not
+for `ox.fs.read` scoped to that turn. A CLI run exercises the real Profile; it does not
 inject tool responses or score a baseline. Use controlled fixture services for
 scripted responses, never real inboxes or accounts as stand-ins.
 

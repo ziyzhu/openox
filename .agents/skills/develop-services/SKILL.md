@@ -15,7 +15,7 @@ Both paths use the same Ox authoring workflow. Built-in services usually evolve 
 
 ## Drive the development loop
 
-Follow [simulator setup](../setup/references/simulator.md) and [Ox CLI](../ox-cli/SKILL.md) for device operation and conversation control. Use the user-selected simulator and its assigned Host endpoint; preserve its data.
+Follow [simulator setup](../setup/references/simulator.md) and [Ox CLI](../ox-cli/SKILL.md) for device operation and conversation control. Use the user-selected simulator and its assigned Profile endpoint; preserve its data.
 
 1. Establish the requested service outcome and whether delivery is Local or built-in. A request to add or update a built-in service authorizes preparing its promotion after live verification; a Local-only request does not authorize publication.
 2. Build, install, and launch the app as needed. Drive a real Ox conversation through `skills/evolve/SKILL.md` for discovery, exploration, action design, implementation, repair, and live verification. Follow its current planning, authentication, attachment, and mutation boundaries. For conversation-local source backups, use complete authorized `ox.fs.read`/`ox.fs.write` exports; `ox.fs.copy` cannot transfer across service and conversation filesystem mounts.

@@ -7,20 +7,20 @@ import { claimSimulator, requireSimulator } from "./simulator.ts";
 
 try {
   const qa = qaCommand({
-    usage: "Usage: bun run sim:website-export --device ox-N --output /private/path/session.snapshot [--host <ws-url>]\nExports cookies/local storage from a running authorized Debug Host. Keep credential-bearing snapshots outside Git.",
-    options: { output: { type: "string" }, host: { type: "string" } },
+    usage: "Usage: bun run sim:website-export --device ox-N --output /private/path/session.snapshot [--profile <ws-url>]\nExports cookies/local storage from a running authorized Debug build. Keep credential-bearing snapshots outside Git.",
+    options: { output: { type: "string" }, profile: { type: "string" } },
   });
   if (!qa.values.device || !qa.values.output) throw new Error("Pass --device and --output explicitly");
   const path = resolve(qa.values.output);
   const parent = await realpath(dirname(path));
   const suffix = relative(await realpath(ROOT), parent);
   if (!suffix || suffix !== ".." && !suffix.startsWith("../") && !isAbsolute(suffix)) throw new Error("Store website sessions outside the repository");
-  const endpoint = qa.values.host ?? qa.debugEndpoint;
+  const endpoint = qa.values.profile ?? qa.debugEndpoint;
   const url = new URL(endpoint);
-  if (!["ws:", "wss:"].includes(url.protocol) || Number(url.port) !== qa.debugPort || url.username || url.password) throw new Error("Use this device's authorized Host on its assigned port");
+  if (!["ws:", "wss:"].includes(url.protocol) || Number(url.port) !== qa.debugPort || url.username || url.password) throw new Error("Use this device's authorized Profile address on its assigned port");
   const release = claimSimulator(qa.device);
   try {
-    if (!await requireSimulator(qa.device)) throw new Error("Launch the source simulator and enable authorized Host access first");
+    if (!await requireSimulator(qa.device)) throw new Error("Launch the source simulator and turn on Allow Connections first");
     const descriptor = await open(path, "wx", 0o600);
     let completed = false;
     try {

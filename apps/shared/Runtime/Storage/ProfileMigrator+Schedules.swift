@@ -16,7 +16,7 @@ extension ProfileMigrator {
             records[schedule.id.uuidString] = try JSONDecoder().decode(JSONValue.self, from: encoder.encode(schedule))
         }
         let result = try await DurableProfileStore.shared.command(scope: scope, value: .object([
-            "action": .string("schedulesImport"), "records": .object(records), "host": .string(Device.hostID),
+            "action": .string("schedulesImport"), "records": .object(records), "host": .string(Device.qualifiedID),
         ]))
         _ = try await DurableProfileStore.shared.command(scope: scope, value: .object(["action": .string("schedulesRecover")]))
         Log.app.info("StorageMigrator.schedules imported profile=\(scope.profileID?.uuidString ?? "none") count=\(records.count) sourcePreserved=true")

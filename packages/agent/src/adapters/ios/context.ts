@@ -5,7 +5,7 @@ import { composeIOSPrompt } from "./prompts";
 import { composeOxTurnSections } from "../../core/ox-prompts";
 import { filesSection, type SystemPromptInput, type TurnState } from "../../core/prompts";
 
-const turnSectionKeys = ["skills", "hosts", "replies", "conversation_files", "storage", "language", "attached_services", "child_conversations"] as const;
+const turnSectionKeys = ["skills", "devices", "replies", "conversation_files", "storage", "language", "attached_services", "child_conversations"] as const;
 
 async function composeFiles(session: ProfileRuntime, state: TurnState, conversationID: ConversationId | undefined) {
   return filesSection(await session.rootEntries(state.fileRoots), state.grantedFolders ?? [],

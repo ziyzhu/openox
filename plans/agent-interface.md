@@ -40,7 +40,7 @@ Non-goals for v1: Claude Code or Codex as agents that run their own loop; live m
 | `conversations.*` | `conversations.*`, same names, agent-level payloads |
 | `RemoteHostProbe` statuses | same statuses for agent rows |
 | `HostProtocols.unsupported` | same for the `agent` protocol version |
-| `OX_HOST_ENDPOINT`, `ox host list` | `OX_AGENT_ENDPOINT`, `ox agent list` |
+| `OX_PROFILE_ENDPOINT`, `ox profile discover` | `OX_AGENT_ENDPOINT`, `ox agent list` |
 | Tailscale, trusted network only | same |
 
 An agent on the same Mac is remote at `ws://127.0.0.1:9877`. The macOS Host is sandboxed (`apps/macos/mac.entitlements`), so only `ox agent serve` spawns processes.
@@ -100,7 +100,7 @@ The Host composes context and runs tools for every agent. For a remote pi, a sma
 - Tools: the extension registers `execute` with `pi.registerTool`. Each call becomes `tools.call` to the Host, which runs `ConversationTool.execute` in that conversation's VM. Same functions, limits, approvals and invocation cards as the built-in agent; secrets resolve on the Host and never reach the agent's machine.
 - Two file systems: pi's own tools (`read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`) act on its machine, `ox.fs` acts on Ox files on the Host. The context names both; skill files are read through `execute`.
 - While a call waits on the user (`ox.user.choose`), the extension streams `tools.progress` through pi's tool update callback.
-- If the Host is unavailable mid-run, `tools.call` fails fast with "Ox Host is unavailable" and pi continues without Ox tools.
+- If the Host is unavailable mid-run, `tools.call` fails fast with "Ox is unavailable" and pi continues without Ox tools.
 - Memory and personal context reach whichever model provider the remote pi uses, as they reach the Host's provider today.
 
 ## Host
@@ -120,7 +120,7 @@ Conversation ──► AgentConnection
 
 ## Boundaries and roadmap
 
-Client → Profile (on a device) → Agent. Host is no longer a concept: what it owned folds into the Profile, and what is left is the Ox app's runtime on a device and the address a Client uses to reach it. Code keeps its Host names where they are plumbing; the `host.*` methods, `ox --host` and `OX_HOST_ENDPOINT` stay as "the address of an Ox app".
+Client → Profile (on a device) → Agent. Host is no longer a concept: what it owned folds into the Profile, and what is left is the Ox app's runtime on a device (`ProfileRuntime`, `apps/*/Runtime`) and the address a Client uses to reach the open Profile (`ox --profile <ws-url>`, `OX_PROFILE_ENDPOINT`, `profile.describe`). A connection reaches only the active Profile, and only while its Allow Connections is on. `host.describe`, `ox --host`, `ox host` and `OX_HOST_*` remain as hidden aliases for older Clients and scripts. The sections above keep their original Host wording as design history.
 
 ```diff
   Role     owns
@@ -169,7 +169,7 @@ Order:
 3. Done: per-Profile secrets (prefixed Keychain accounts) and website logins (store per Profile), migrated to the Profile selected at upgrade.
 4. Website data export and import with `fetchData`/`restoreData`, after a device check of what restores.
 5. Done: policy, services, providers and remote agents live in `<Profile>/.ox/`, migrated to the Profile selected at upgrade.
-6. Done: drop Host from the UI and docs. Settings has a Device row (this device or another device running Ox, shown as "<active Profile> · <device>" from host.describe's new device and profile fields) and Allow connections; the Mac app is "Ox"; CLI help, README and the website's privacy and support pages describe devices and Profiles. No code or protocol rename.
+6. Done: drop Host everywhere. Settings has one Default agent row; Allow Connections lives on each Profile; the remote Host picker is gone. Code, CLI and protocol use Profile and runtime names (see Boundaries); the Mac app is "Ox" with ai.openox.mac.local identifiers.
 
 ## Notifications
 
@@ -314,7 +314,7 @@ Later, if wanted: let the built-in agent use a remote machine's pi providers (fo
 
 ## Implementation status
 
-- Shipped: `AgentConnection` split as `Conversation.submit` → `submitRemote` for remote bindings; `RemoteAgentClient` (WebSocket JSON-RPC), `RemoteAgentDirectory` (`remote-agents.json`, probe status, models, default agent); `RemoteAgentEvents` maps pi RPC events onto `AgentEvent` using the `AssistantPartial` stream shared with `DurableAgentHost`; `composeContext` renders Ox sections for remote pi; `execute` runs on the Host through `tools.call`; `agents.*` and `agentEndpoint` on `conversations.new`; `ox agent serve`, `ox agent describe`, `ox host agents`, `ox conversation new --agent`; agent button, `AgentPickerSheet`, Settings → Agents and Default agent, sidebar marker; branch, retry and edit hidden for remote conversations.
+- Shipped: `AgentConnection` split as `Conversation.submit` → `submitRemote` for remote bindings; `RemoteAgentClient` (WebSocket JSON-RPC), `RemoteAgentDirectory` (`remote-agents.json`, probe status, models, default agent); `RemoteAgentEvents` maps pi RPC events onto `AgentEvent` using the `AssistantPartial` stream shared with `DurableAgentHost`; `composeContext` renders Ox sections for remote pi; `execute` runs on the Host through `tools.call`; `agents.*` and `agentEndpoint` on `conversations.new`; `ox agent serve`, `ox agent describe`, `ox profile agents`, `ox conversation new --agent`; agent button, `AgentPickerSheet`, Settings → Agents and Default agent, sidebar marker; branch, retry and edit hidden for remote conversations.
 - Ox sections are sent to pi as `ox_<key>`: pi rejects a custom `preamble` section and would replace its own `rules` and `skills`.
 - Remote turns are recorded as `ox.native.turn` entries after each run, because the projection restores turns only from entries that carry model messages.
 - Step 1 (renaming the local agent's actions to pi names) was skipped: both connections already meet at `AgentEvent`, and the rename would only churn the durable bridge.

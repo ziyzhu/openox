@@ -52,18 +52,18 @@ it("ships a standalone prompt renderer without a Profile, native bridge, or sepa
 it("shares the core across hosts and rejects ambiguous ownership in the shipped renderer", async () => {
   const realm = createContext({ console: undefined });
   runInContext(await Bun.file(new URL("../../../apps/shared/Resources/PiDurable.bundle/prompts.js", import.meta.url)).text(), realm);
-  const scope = { hostID: "desktop-host", profileID: "profile-a" };
-  realm.input = { memory: "frozen", hostContext: { active: scope,
-    hosts: [{ ...scope, functions: ["ox.fs.read", "ox.fs.edit", "ox.fs.write"], serviceKinds: [], presentation: "text", externalFiles: false }] } };
+  const scope = { deviceID: "desktop-host", profileID: "profile-a" };
+  realm.input = { memory: "frozen", deviceContext: { active: scope,
+    devices: [{ ...scope, functions: ["ox.fs.read", "ox.fs.edit", "ox.fs.write"], serviceKinds: [], presentation: "text", externalFiles: false }] } };
   const prompt = runInContext("OxPrompts.composeOxPrompt(input).rendered", realm) as string;
   expect(prompt).toContain("frozen");
   expect(prompt).not.toContain("iOS");
   expect(prompt).not.toContain("ox.app");
   expect(prompt).not.toContain("mounts/<folder-id>");
   expect(prompt).not.toContain("ox.service.showPage");
-  expect(() => runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,active:{hostID:'wrong',profileID:'profile-a'}}})", realm)).toThrow("unavailable");
-  expect(() => runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,hosts:[...input.hostContext.hosts,...input.hostContext.hosts]}})", realm)).toThrow("Duplicate");
-  expect(runInContext("OxPrompts.composeOxPrompt({...input,hostContext:{...input.hostContext,hosts:[{...input.hostContext.hosts[0],functions:['ox'],serviceKinds:['web','api','ios','mcp'],presentation:'conversation-bubbles',externalFiles:true}]}}).rendered", realm)).toBe(prompt);
+  expect(() => runInContext("OxPrompts.composeOxPrompt({...input,deviceContext:{...input.deviceContext,active:{deviceID:'wrong',profileID:'profile-a'}}})", realm)).toThrow("unavailable");
+  expect(() => runInContext("OxPrompts.composeOxPrompt({...input,deviceContext:{...input.deviceContext,devices:[...input.deviceContext.devices,...input.deviceContext.devices]}})", realm)).toThrow("Duplicate");
+  expect(runInContext("OxPrompts.composeOxPrompt({...input,deviceContext:{...input.deviceContext,devices:[{...input.deviceContext.devices[0],functions:['ox'],serviceKinds:['web','api','ios','mcp'],presentation:'conversation-bubbles',externalFiles:true}]}}).rendered", realm)).toBe(prompt);
   realm.guide = { catalog: "ox.fs.read", timeoutSeconds: 10, maxLines: 100, maxBytes: 2048, canCancelLoops: true };
   const guide = runInContext("OxPrompts.executeGuidance(guide)", realm) as string;
   expect(guide).toContain("10 seconds");

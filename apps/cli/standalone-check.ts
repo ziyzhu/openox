@@ -55,7 +55,7 @@ exec '${Bun.which("curl")!.replaceAll("'", "'\\''")}' "$@"
   });
   await cp(resolve(import.meta.dir, "../../examples/repository"), repositoryDirectory, { recursive: true });
   await writeFile(join(runtimeDirectory, "bunfig.toml"), 'preload = ["./does-not-exist.ts"]\n');
-  await writeFile(join(runtimeDirectory, ".env"), "OX_HOST_ENDPOINT=ws://127.0.0.1:1\n");
+  await writeFile(join(runtimeDirectory, ".env"), "OX_PROFILE_ENDPOINT=ws://127.0.0.1:1\n");
   const executable = join(runtimeDirectory, "ox");
   const version = (await run([executable, "--version"])).trim();
   if (version !== packageMetadata.version) throw new Error(`Unexpected version: ${version}`);

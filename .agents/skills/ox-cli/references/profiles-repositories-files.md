@@ -1,24 +1,22 @@
 # Profiles, repositories, and files
 
-## Administer a Profile
+## Update the open Profile
 
-Manage Profiles through their owning Host:
+A connection reaches only the Profile active on that device:
 
 ```sh
-ox --host <ws-url> profile list --json
-ox --host <ws-url> profile create --name <name> --json
-ox --host <ws-url> profile select <id>
-ox --host <ws-url> profile inspect <id> --json
-ox --host <ws-url> profile rename <id> --name <name>
-ox --host <ws-url> --profile <id> profile update --memory-file <path>
+ox --profile <ws-url> profile describe
+ox --profile <ws-url> profile inspect --json
+ox --profile <ws-url> profile rename --name <name>
+ox --profile <ws-url> profile update --memory-file <path>
 ```
 
-Create does not select the new Profile. Selection and updates reject running conversations; stop them explicitly first. Name and memory updates use existing Host persistence, not replacement of `profile.json`. Inspect after a failed update before retrying, because earlier writes may have succeeded.
+Create, select, and delete Profiles in Ox on the device; connections cannot switch or reach other Profiles. Updates reject running conversations; stop them explicitly first. Name and memory updates use Ox's own persistence, not replacement of `profile.json`. Inspect after a failed update before retrying, because earlier writes may have succeeded.
 
-For offline inspection, discover iCloud Profiles on macOS and select one by directory. Unset `OX_HOST_ENDPOINT` for discovery so `profile list` does not query a Host; an explicit `--profile <path>` selects offline reads without unsetting it:
+For offline inspection, discover iCloud Profiles on macOS and select one by directory. Unset `OX_PROFILE_ENDPOINT` for discovery so `profile list` reads folders; an explicit `--profile <path>` selects offline reads without unsetting it:
 
 ```sh
-env -u OX_HOST_ENDPOINT ox profile list [--json]
+env -u OX_PROFILE_ENDPOINT ox profile list [--json]
 ox --profile <path> profile memory
 ox --profile <path> profile skills [name] [--json]
 ox --profile <path> profile files [filename] [--json]
@@ -48,23 +46,23 @@ requirement before invoking it.
 ## Download files
 
 ```sh
-ox --host <ws-url> --conversation <id> files download report.pdf --output ./report.pdf
-ox --host <ws-url> --conversation <id> conversation inspect --blocks --json
-ox --host <ws-url> --conversation <id> files download --attachment <attachment-id> --output ./upload.pdf
+ox --profile <ws-url> --conversation <id> files download report.pdf --output ./report.pdf
+ox --profile <ws-url> --conversation <id> conversation inspect --blocks --json
+ox --profile <ws-url> --conversation <id> files download --attachment <attachment-id> --output ./upload.pdf
 ```
 
-Use an attachment ID from the conversation blocks or a virtual file path such as a conversation-relative file or `mounts/<grant-id>/<file>`. The conversation must be loaded. Downloads preserve the stored bytes, use the Host's file-read policy and grants, and never overwrite an existing local file. The Host caps downloads at 32 MiB, with existing lower limits where applicable. Managed `app/` files and generated `tmp/` output are not downloadable.
+Use an attachment ID from the conversation blocks or a virtual file path such as a conversation-relative file or `mounts/<grant-id>/<file>`. The conversation must be loaded. Downloads preserve the stored bytes, use the Profile's file-read policy and grants, and never overwrite an existing local file. Ox caps downloads at 32 MiB, with existing lower limits where applicable. Managed `app/` files and generated `tmp/` output are not downloadable.
 
 ## Connect a repository through Files
 
 ```sh
-ox --host <ws-url> files mount --timeout 120000
-ox --host <ws-url> files list --json
-ox --host <ws-url> repository connect mounts/<grant-id>[/subfolder]
-ox --host <ws-url> repository list --json
-ox --host <ws-url> service sync
-ox --host <ws-url> repository disconnect <repository-id>
-ox --host <ws-url> files unmount <grant-id>
+ox --profile <ws-url> files mount --timeout 120000
+ox --profile <ws-url> files list --json
+ox --profile <ws-url> repository connect mounts/<grant-id>[/subfolder]
+ox --profile <ws-url> repository list --json
+ox --profile <ws-url> service sync
+ox --profile <ws-url> repository disconnect <repository-id>
+ox --profile <ws-url> files unmount <grant-id>
 ```
 
-The Host's native picker grants access; a CLI-local path cannot authorize remote access. Connection is explicit and persistent, separate from managed Local. Source must use the current repository version; it is read in place without migration or Git seeding. Current Hosts expose repository files under `repositories/<repository-id>/...`; only files inside Local are writable through that view. Edit connected repositories through the granted Files mount or your editor, not their read-only repository view. Revocation makes connected services unavailable; disconnect does not delete their files. Grant IDs are stable for one grant and never reused for a new authorization. Mounts belong to the selected Profile; `--profile <id>` scopes `files` commands without switching. Existing grants appear as unassigned until `files assign <id>` or explicit assignment in Profile → Files. No Files service attachment is required. Mounted services follow the grant's Profile. Older builds do not enforce ownership and can discard ownership fields on writes; downgrade requires review.
+The device's native picker grants access; a CLI-local path cannot authorize remote access. Connection is explicit and persistent, separate from managed Local. Source must use the current repository version; it is read in place without migration or Git seeding. Current Ox builds expose repository files under `repositories/<repository-id>/...`; only files inside Local are writable through that view. Edit connected repositories through the granted Files mount or your editor, not their read-only repository view. Revocation makes connected services unavailable; disconnect does not delete their files. Grant IDs are stable for one grant and never reused for a new authorization. Mounts belong to the open Profile. Existing grants appear as unassigned until `files assign <id>` or explicit assignment in Profile → Files. No Files service attachment is required. Mounted services follow the grant's Profile. Older builds do not enforce ownership and can discard ownership fields on writes; downgrade requires review.

@@ -36,7 +36,7 @@ Use `ox.skill.delete` when the user requests deletion. Saved invocations and sch
 
 ## Local repository
 
-Repository skills live at the repository root under `skills/<name>/`. The repository manifest lists skill names alongside service registrations. Services and skills are independent. Service dependencies can come from any enabled repository. Inspect their current contracts before invoking actions under normal authentication and Action policies. The Host loads current valid source on demand.
+Repository skills live at the repository root under `skills/<name>/`. The repository manifest lists skill names alongside service registrations. Services and skills are independent. Service dependencies can come from any enabled repository. Inspect their current contracts before invoking actions under normal authentication and Action policies. Ox loads current valid source on demand.
 
 Use `ox.skill.share({ name, purpose })` to copy the full package into Local as editable repository content. Review it for personal details before sharing. If the name already exists in Local, inspect the existing skill and agree on a revision or another name. If sources conflict, ask the user to select Local in the Skills library before testing it.
 

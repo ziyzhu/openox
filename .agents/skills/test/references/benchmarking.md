@@ -32,7 +32,7 @@ Definition shape, with real frozen identities and hashes substituted:
     "provider": "explicit configured identifier",
     "model": "explicit discovered identifier",
     "reasoning": "medium",
-    "device": "reserved device, OS and assigned Host endpoint",
+    "device": "reserved device, OS and assigned Profile endpoint",
     "caches": "Not cleared; document any prewarming"
   }
 }

@@ -5,11 +5,11 @@ description: "Use to establish or recover service access: website sign-in and ac
 
 # Authentication
 
-Establish the access needed for the original request, verify it through the service's own contracts, then resume the task. Preserve accounts, existing sessions, tenant context, and runtime approvals. Never request passwords, codes, tokens, or API keys in chat, source, or files; credential values stay in Host-managed interfaces. Do not sign out, revoke access, clear data, or switch accounts merely to test authentication. Honor cancellation and denied approvals without reopening automatically. Inspect current task state before retrying an interrupted mutation; completing setup does not authorize replaying uncertain effects.
+Establish the access needed for the original request, verify it through the service's own contracts, then resume the task. Preserve accounts, existing sessions, tenant context, and runtime approvals. Never request passwords, codes, tokens, or API keys in chat, source, or files; credential values stay in Ox-managed interfaces. Do not sign out, revoke access, clear data, or switch accounts merely to test authentication. Honor cancellation and denied approvals without reopening automatically. Inspect current task state before retrying an interrupted mutation; completing setup does not authorize replaying uncertain effects.
 
 ## Choose the service flow
 
-Use the known service kind and canonical domain, inspecting only when contracts or identity are missing. Invoke standard actions through `ox.service.invoke({ purpose, name, input: {} })`; their complete contracts are supplied upfront. Only web services require a live frameId and support website session descriptors. Non-web setup uses the Host's native interface, not Browser or website login. Attaching a service adds its conversation chip but does not authenticate it or grant permissions; inspection does not require attachment. Invocation automatically attaches the service when needed, including standard setup actions, under normal attachment policy.
+Use the known service kind and canonical domain, inspecting only when contracts or identity are missing. Invoke standard actions through `ox.service.invoke({ purpose, name, input: {} })`; their complete contracts are supplied upfront. Only web services require a live frameId and support website session descriptors. Non-web setup uses Ox's native interface, not Browser or website login. Attaching a service adds its conversation chip but does not authenticate it or grant permissions; inspection does not require attachment. Invocation automatically attaches the service when needed, including standard setup actions, under normal attachment policy.
 
 | Kind | Check when access needs diagnosis | Establish access |
 | --- | --- | --- |
@@ -22,19 +22,19 @@ Reuse existing access that fits the request; do not add status checks before eve
 
 ## API credentials
 
-`credentialStatus` reads local configuration without contacting the API. A configured result does not prove the server accepts the credentials. When setup is needed, explain the step and await `configureCredentials` with empty input; the Host owns API-key, HTTP basic/bearer, and supported OAuth entry and token handling. Never supply credential values or website session descriptors as action input. OAuth must use an existing client registered as OpenOx; use Evolve's API-service reference for missing or incorrect public configuration.
+`credentialStatus` reads local configuration without contacting the API. A configured result does not prove the server accepts the credentials. When setup is needed, explain the step and await `configureCredentials` with empty input; Ox owns API-key, HTTP basic/bearer, and supported OAuth entry and token handling. Never supply credential values or website session descriptors as action input. OAuth must use an existing client registered as OpenOx; use Evolve's API-service reference for missing or incorrect public configuration.
 
 After configuration, verify a bounded authenticated read needed by the task, using the intended account or tenant when the API exposes it. If no suitable read exists, report configuration as complete but server access as unverified. Treat rejected credentials, insufficient scopes, wrong accounts, and network errors according to observed evidence; do not repeatedly reopen setup or weaken authentication to pass a check. A changed base URL or auth configuration requires setup again.
 
 ## MCP authorization
 
-`connectionStatus` and `authorize` accept empty input and remain available before tool discovery succeeds. For a known saved server, call them directly when discovery is blocked by authorization; do not require successful inspection first. Connectivity failures do not establish missing authorization or an empty tool catalog. When authorization is needed, explain the step and await the Host's supported `authorize` flow. Do not move authorization URLs to Browser, collect tokens, or invent unsupported login methods.
+`connectionStatus` and `authorize` accept empty input and remain available before tool discovery succeeds. For a known saved server, call them directly when discovery is blocked by authorization; do not require successful inspection first. Connectivity failures do not establish missing authorization or an empty tool catalog. When authorization is needed, explain the step and await Ox's supported `authorize` flow. Do not move authorization URLs to Browser, collect tokens, or invent unsupported login methods.
 
 After authorization, inspect the server's tools and perform a bounded read needed by the task when available. An authorized or notRequired result establishes connection readiness, not permission for every tool or verified task completion. Preserve the chosen server and account; report discovery, scope, transport, or unsupported-authorization blockers without silently substituting another service.
 
 ## iOS permissions
 
-`permissionStatus` reads OS permission state without prompting. On authorizationRequired, explain why access is needed and await `requestPermission` through the Host. On denied, explain the required app permission in system Settings if the user wants to proceed; do not repeatedly request access or claim the agent changed Settings. Recheck state after the user changes it. OS permission is separate from account authentication and runtime Action approval.
+`permissionStatus` reads OS permission state without prompting. On authorizationRequired, explain why access is needed and await `requestPermission` through Ox. On denied, explain the required app permission in system Settings if the user wants to proceed; do not repeatedly request access or claim the agent changed Settings. Recheck state after the user changes it. OS permission is separate from account authentication and runtime Action approval.
 
 After access is granted, verify the task's bounded read when one is available. Request only the relevant service's permission; do not create or send data to test access. Report denied, restricted, or unsupported capabilities accurately and stop dependent work when access remains unavailable.
 
@@ -76,7 +76,7 @@ The call asynchronously waits for Done/Cancel and returns only { status: "comple
 | Done but destination still signed out or wrong account | Do not claim success or run protected work. Explain the observed state and ask whether to continue manually; present the page if the user chooses another attempt. |
 | Cancel, denied approval, or failed presentation | Stop dependent work. Preserve the page and report the outcome; never automatically reopen or replay login. |
 
-Repairing automatic login does not authorize using a real account as a test fixture. Dry-run screen classification without retrieving or submitting credentials. Verify a repaired automatic submission only once with a dedicated user-saved test account and explicit consent, as described in Evolve's authentication reference; otherwise report the repair as unverified. Never request a sign-out or repeated credential submission just to improve diagnostics. The Host may offer to remember credentials after Done; saved credentials and structural traces are not returned to the agent as values.
+Repairing automatic login does not authorize using a real account as a test fixture. Dry-run screen classification without retrieving or submitting credentials. Verify a repaired automatic submission only once with a dedicated user-saved test account and explicit consent, as described in Evolve's authentication reference; otherwise report the repair as unverified. Never request a sign-out or repeated credential submission just to improve diagnostics. Ox may offer to remember credentials after Done; saved credentials and structural traces are not returned to the agent as values.
 
 ## Verify website sign-in and resume
 

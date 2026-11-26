@@ -15,7 +15,7 @@ Read before creating or substantially revising HTML. Build the requested experie
 
 Design the bounded inline conversation card first, with useful content and the primary control visible at phone width; expansion is optional. Support 320 px through iPad without horizontal page scrolling, clipped labels, fixed outer widths, or fixed viewport heights. Wrap or stack controls. Do not rely on expansion, hover, or desktop width.
 
-Make the result feel like part of the conversation, not a separate dashboard. Match the conversation background edge to edge, with one readable column and one layer of equal padding (normally 16 px). Keep the heading, explanation, and controls on that background. Give only the plot, illustration, or other content that needs a boundary a subtle rounded surface; don't nest it in another filled card. Avoid pure-black panels, gradients, shadows, decorative borders, and imitations of Host navigation or composer controls.
+Make the result feel like part of the conversation, not a separate dashboard. Match the conversation background edge to edge, with one readable column and one layer of equal padding (normally 16 px). Keep the heading, explanation, and controls on that background. Give only the plot, illustration, or other content that needs a boundary a subtle rounded surface; don't nest it in another filled card. Avoid pure-black panels, gradients, shadows, decorative borders, and imitations of Ox navigation or composer controls.
 
 Use this baseline with your own root ID and only the rules the result needs. The palette matches Ox's conversation and control colors in both appearances.
 
@@ -63,11 +63,11 @@ Write one self-contained UTF-8 fragment below 200 KB to a short lowercase `<name
 
 Use one unique root ID and scope CSS/DOM queries to it. Put scripts after markup, check queried elements, initialize once, and update accessible state with primary interactions. Do not depend on ambient globals or browser storage. Read existing files completely before revision and keep the same path unless an independent copy is requested.
 
-The content policy forbids browser network requests, remote subresources, external libraries, form submission, frames, file input, workers, object embeds, sensors, geolocation, camera, and microphone. Inline native buttons, inputs, and selects can update local state or call the injected Host service SDK.
+The content policy forbids browser network requests, remote subresources, external libraries, form submission, frames, file input, workers, object embeds, sensors, geolocation, camera, and microphone. Inline native buttons, inputs, and selects can update local state or call the injected service SDK.
 
-## Host service SDK
+## Service SDK
 
-The Host injects `window.ox.service` before scripts. Only this namespace is available, not `ox.fs`, `ox.web`, `ox.user`, or other VM APIs. Use inspected action contracts, normal options objects and `purpose`, and synchronous `.help()`.
+Ox injects `window.ox.service` before scripts. Only this namespace is available, not `ox.fs`, `ox.web`, `ox.user`, or other VM APIs. Use inspected action contracts, normal options objects and `purpose`, and synchronous `.help()`.
 
 HTML runs independently of its creating conversation. Services initialize on demand; conversation chips are not required. Use `find`/`inspect` and qualified `web:<domain>:<action>`, `ios:<app>:<action>`, or `mcp:<server>:<action>` names. Discovery reports `attached: false` because the page has no conversation attachments.
 

@@ -325,14 +325,14 @@ final class Schedules {
             guard StorageRoot.shared.scope == scope else { throw CancellationError() }
             try publish(result, in: scope)
             var recovered = all
-            let newHost = result.objectValue?["host"]?.stringValue != Device.hostID
+            let newDevice = result.objectValue?["host"]?.stringValue != Device.qualifiedID
             for index in recovered.indices {
                 if case .running = recovered[index].state {
                     recovered[index].state = .paused
                     recovered[index].lastOutcome = .failed("The previous check was interrupted. Review its conversation before resuming.")
-                } else if newHost, recovered[index].state == .active { recovered[index].state = .paused }
+                } else if newDevice, recovered[index].state == .active { recovered[index].state = .paused }
             }
-            if recovered != all || newHost { try await save(recovered, reason: "recover", scheduleID: UUID.zero) }
+            if recovered != all || newDevice { try await save(recovered, reason: "recover", scheduleID: UUID.zero) }
             loading = nil
             Log.app.info("Schedules.load profile=\(scope.profileID?.uuidString ?? "none") count=\(all.count)")
         } catch {
@@ -617,7 +617,7 @@ final class Schedules {
         do {
             result = try await DurableProfileStore.shared.command(scope: scope, value: .object([
                 "action": .string("schedulesReplace"), "revision": .int(revision),
-                "records": .object(records), "host": .string(Device.hostID),
+                "records": .object(records), "host": .string(Device.qualifiedID),
             ]))
         } catch {
             if loadedScope == scope { preparation = .needsRecovery(error.localizedDescription) }

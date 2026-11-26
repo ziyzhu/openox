@@ -7,7 +7,7 @@ export { composeSystemPrompt, composeTurnSections, renderSections, responseDirec
   filesSection, type RootEntry, type SystemPromptInput, type PromptScaffold, type TurnState, type ResponseLanguage } from "./core/prompts";
 export { providerIdentity } from "./core/provider-prompts";
 export { composeOxPrompt, composeOxTurnSections, oxScaffold } from "./core/ox-prompts";
-export { activeHost, sameScope, hostContextText, type HostScope, type PromptHost, type HostContext } from "./core/host-context";
+export { activeDevice, sameScope, deviceContextText, type DeviceScope, type PromptDevice, type DeviceContext } from "./core/device-context";
 export { executeGuidance, type ExecuteGuidanceInput } from "./core/tool-prompts";
 export { runtimeEvent, failureReceipt, outputTruncation, imageReadGuidance, type RuntimeEvent } from "./core/runtime-prompts";
 export { guidanceText } from "./core/guidance-texts";

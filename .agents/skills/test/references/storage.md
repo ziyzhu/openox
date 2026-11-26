@@ -20,7 +20,7 @@ types remain authoritative in their `Codable` implementations.
 │   │   │   ├── external-profiles.json      selected Profile bookmarks/display names
 │   │   │   └── device-folder-grants.json    Profile-bound native bookmarks
 │   │   ├── state.json                      format-1 onboarding, starter count, active Profile,
-│   │   │                                   cached region, ChatGPT agent Host identity,
+│   │   │                                   cached region, ChatGPT agent identity,
 │   │   │                                   optional What's New version and Profile configuration migration flag
 │   │   ├── service-repositories/development/ simulator development HEAD snapshot
 │   │   ├── RepositoryStaging/<Profile UUID>/ private repository downloads, recoverable snapshot backups, and mutation staging
@@ -104,28 +104,28 @@ Service-inspector conversation content optionally stores `pageID`, a transient l
 - Connection settings files — owner: Platform/Models/ConnectionAccess.swift; one per Profile, kept when switching Profiles, normal device backup eligibility, absent permission defaults off. Only trusted user controls can change them.
 - Language settings file — owners: Platform/Models/AppSettings.swift and AppLocale; persisted before publishing the observable language and nonisolated locale cache.
 - Service preferences and Action policy files — owner: Services/ServiceManager.swift; persist before publishing changes. Unavailable policy is Ask, and failed Always allow publication does not approve the pending operation.
-- Provider configuration and model caches — owner: Host/ModelProviders/ProviderRegistry.swift; configuration uses the Profile state directory and derived model caches use Caches; preference conversion belongs to ApplicationStorageMigrator
-- Keychain credentials — owner: Host/Credentials/Credentials.swift
+- Provider configuration and model caches — owner: Runtime/ModelProviders/ProviderRegistry.swift; configuration uses the Profile state directory and derived model caches use Caches; preference conversion belongs to ApplicationStorageMigrator
+- Keychain credentials — owner: Runtime/Credentials/Credentials.swift
 - Retired read-aloud voice preference — retained in UserDefaults and ignored
 - iOS appearance — owner: Client/UI/Theme.swift; `appearance` in the app's standard UserDefaults domain stores `system`, `light`, or `dark` through SwiftUI AppStorage. Missing values follow System. App-wide across Profiles, eligible for normal device backup, retained until changed or app data is removed. OxApplicationView applies the override; SettingsSheet edits it.
 - iOS voice input language — owner: Client/Features/Conversation/SpeechRecording.swift (`SpeechLanguage`); `speech.language` in the app's standard UserDefaults domain stores a BCP 47 identifier through SwiftUI AppStorage. Missing or empty values follow the app language. App-wide across Profiles, eligible for normal device backup, retained until changed or app data is removed. SettingsSheet edits it.
-- Fixed app-storage paths and backup policy — owner: Host/Storage/AppStoragePaths.swift
-- Active and saved profiles — owners: Host/Storage/StorageRoot.swift and Host/Profile/ProfileStore.swift
-- Profile execution/history/documents — owner: Pi Durable; host-neutral open runtime: packages/agent/src/profile/runtime.ts (`ProfileRuntime`, formerly `OxAgentSession`; persisted formats unchanged); native Session/owner lifetime: Host/Durable/DurableProfileStore.swift; native conversation/presentation: Host/Conversations/Conversation.swift and ConversationManager.swift; application facade: Host/Profile/ProfileRepository.swift. Native type renames do not change persisted ConversationMeta, Turn, RPC, or compatibility-ID formats.
-- Compatibility startup/recovery ordering — owner: Host/Storage/StorageMigration.swift
-- Profile milestones, conversion, and publication recovery — owner: Host/Storage/ProfileMigrator.swift and its `ProfileMigrator+*.swift` extensions
-- App-wide preferences, catalogs, bookmarks, and schedules — owner: Host/Storage/ApplicationStorageMigrator.swift
-- Credential conversion — owner: Host/Storage/CredentialMigrator.swift
-- Repository compatibility — owner: Host/Storage/RepositoryMigrator.swift
-- Shared stateless conversion and verified-copy helpers — owner: Host/Storage/StorageMigrationSupport.swift
-- File metadata — owner: Host/Files/FileItem.swift
+- Fixed app-storage paths and backup policy — owner: Runtime/Storage/AppStoragePaths.swift
+- Active and saved profiles — owners: Runtime/Storage/StorageRoot.swift and Runtime/Profile/ProfileStore.swift
+- Profile execution/history/documents — owner: Pi Durable; host-neutral open runtime: packages/agent/src/profile/runtime.ts (`ProfileRuntime`, formerly `OxAgentSession`; persisted formats unchanged); native Session/owner lifetime: Runtime/Durable/DurableProfileStore.swift; native conversation/presentation: Runtime/Conversations/Conversation.swift and ConversationManager.swift; application facade: Runtime/Profile/ProfileRepository.swift. Native type renames do not change persisted ConversationMeta, Turn, RPC, or compatibility-ID formats.
+- Compatibility startup/recovery ordering — owner: Runtime/Storage/StorageMigration.swift
+- Profile milestones, conversion, and publication recovery — owner: Runtime/Storage/ProfileMigrator.swift and its `ProfileMigrator+*.swift` extensions
+- App-wide preferences, catalogs, bookmarks, and schedules — owner: Runtime/Storage/ApplicationStorageMigrator.swift
+- Credential conversion — owner: Runtime/Storage/CredentialMigrator.swift
+- Repository compatibility — owner: Runtime/Storage/RepositoryMigrator.swift
+- Shared stateless conversion and verified-copy helpers — owner: Runtime/Storage/StorageMigrationSupport.swift
+- File metadata — owner: Runtime/Files/FileItem.swift
 - Folder bookmarks — owner: Services/Native/DeviceFolderStore.swift; records include nullable profileId, with unassigned grants inaccessible until explicitly assigned. ApplicationStorageMigrator stamps predecessor records as unassigned while preserving bookmarks. ProfileMigrator filters retired ios:files attachments at the ProfileRepository metadata boundary; ordinary saves converge them. ApplicationStorageMigrator expands Files source policies into filesystem Action overrides without widening approval. Older readers ignore Profile ownership, and older writes can lose ownership fields; downgrade is not ownership-compatible. iOS uses minimal bookmarks, macOS uses security-scoped bookmarks through target-owned adapters. New grant IDs include UUIDs so revocation followed by mounting another folder cannot revive an old binding.
 - Mounted repository bindings — owner: Services/Repository/MountedRepositoryStore.swift; device-local, visible/executable only through a grant owned by the active Profile, no source copies or migration. Missing settings mean no connections; malformed or future versions are preserved and block binding mutations. Revoked grants leave unavailable bindings until explicitly disconnected. Older builds retain but do not discover these bindings; mounted-repository functionality is not downgrade-compatible.
 - Service repositories — owner: Services/Repository/Repository.swift and its Repository+*.swift extensions
 - Service-search vector cache — owner: Services/Repository/ServiceSearchIndex.swift
 - App log file — owner: Diagnostics/LogFile.swift
-- Shared note inbox — owner: Host/Profile/SharedNoteInbox.swift and ShareExtension
-- Scheduled skill definitions and run state — owners: Host/Skills/ScheduledSkills.swift and Host/Conversations/ScheduledSkillScheduler.swift
+- Shared note inbox — owner: Runtime/Profile/SharedNoteInbox.swift and ShareExtension
+- Scheduled skill definitions and run state — owners: Runtime/Skills/ScheduledSkills.swift and Runtime/Conversations/ScheduledSkillScheduler.swift
 - Developer bootstrap credentials — owner: .agents/skills/setup/scripts/bootstrap.ts
 - Debug Simulator device templates — schema/launcher: .agents/skills/setup/scripts/template-schema.ts and template.ts; native startup importer: Development/DeviceTemplate.swift. Control files live under Library/Caches/DeviceTemplates, are excluded from normal startup without explicit launch opt-in, and never become Profiles. Loaded input is removed and private credentials are released after application. Result/previous-preference files are purgeable QA artifacts; evidence copies stay outside Git. Template-created Profiles use ordinary production storage and remain until explicitly removed.
 
@@ -228,7 +228,7 @@ fork-aware scrollback separately from active model context. Read-only virtual
 `conversations/<Pi-ID>/metadata` and `history` are generated from Pi, never disk transcripts. The native UUID projection uses `conversations/<uuid>/conversation.json` and `turns.jsonl`. Old `chats/` virtual paths and `ox.chat` calls remain compatibility aliases for user-authored code. `StorageMigrator` rewrites stored `ox.chat.start` and `ox.chat.delete` approval keys to `ox.conversation.start` and `ox.conversation.delete` before policy consumers initialize; existing destination policies win collisions, and subsequent launches are no-ops. Predecessor disk paths, document kinds, and UUID binding keys are unchanged.
 Physical image results use `oxAttachment`/`oxProfileID`, not image Base64 in history.
 Temporary native routing still retains explicit `ox.chat` UUID compatibility.
-Portable Profiles activate Pi after the storage gate at their selected folder. No simultaneous cross-device editing or raw active-database export is supported. Native UI testing uses direct simulator interaction; Host RPC still requires authorized VPN ingress without loopback exceptions.
+Portable Profiles activate Pi after the storage gate at their selected folder. No simultaneous cross-device editing or raw active-database export is supported. Native UI testing uses direct simulator interaction; Profile RPC still requires authorized VPN ingress without loopback exceptions.
 
 Profile export captures a complete, closed snapshot, validates its SHA-256 inventory, and returns a directory containing visible files plus `profile.json`, `.ox/state.sqlite`, and `.ox/payloads`. The format-1 ZIP is an internal temporary encoding, not the exported document. Capture refuses pending tasks, submissions, and file changes, closes/checkpoints the runtime, and coordinates the folder read without a file ownership lock. Exports retain the Profile identity and are bounded to 128 MiB and 10,000 entries. Credentials, folder grants, app settings, staging, temporary conversations, and migration journals are excluded; schedules are included in the Profile database. Files chooses the destination; a completed save does not establish completed iCloud upload. Open Existing opens the exported directory in place; there is no separate Import action. Create accepts a Files-selected parent and publishes a verified fresh Profile there. Move first closes the source, verifies a complete copy including empty directories, switches its bookmark, and retains the original until explicit removal confirmation. Removal checks the original inventory again; changed originals remain untouched. Missing remembered folders stay unavailable and can be reconnected only to the same Profile identity; they do not silently select another copy or create an empty replacement. Optional bookmark display names are additive; older records remain readable.
 
@@ -258,8 +258,8 @@ Provider media uses request-owned verified bytes, and preview/share/HTML sibling
 ## Compatibility gate
 
 `StorageMigrator` coordinates three levels. App: `migrateApp` runs structural
-migrations before the Host and its storage consumers are constructed. Profile:
-Host preparation validates application storage, migrates the selected Profile,
+migrations before Ox and its storage consumers are constructed. Profile:
+Runtime preparation validates application storage, migrates the selected Profile,
 its repositories and its Profile-bound credentials, and prepares the Local
 service repository before conversations, service discovery, or search indexing
 load persisted state. Selecting or opening another Profile also migrates it
@@ -281,7 +281,7 @@ and directs the user to update Ox or locate the folder.
 Local repository and scheduled-skill preparation failures isolate those resources
 instead of blocking a compatible Profile. Normal resource access and writes remain
 gated; Local services/skills are excluded and schedules neither execute nor accept
-edits. The Host retries through `StorageMigrator` with backoff capped at five minutes
+edits. Ox retries through `StorageMigrator` with backoff capped at five minutes
 while foregrounded, pauses in background, and retries on later launches and foreground
 activation. Successful recovery reloads the catalog or activates scheduling without
 requiring user action. Incompatible data is retained, never reset or replaced with a
@@ -309,11 +309,11 @@ MCP definitions that they cannot update.
 
 ## Shared preferences
 
-Language and Host access remain app-wide JSON files under Application Support/Configuration, with internal state in Application Support/state.json. Secret metadata is device-local and scoped by Profile UUID; Keychain values and device-bound bookmarks are not exported. ApplicationStorageMigrator converts predecessor JSON catalogs and preferences, including the actual `chatgpt.agentHostID` key. Ignored `chatgpt.installationId`, `api.url`, retired voice/theme keys, and framework preferences are not activated or swept.
+Language remains an app-wide JSON file under Application Support/Configuration and Allow Connections is device-local per Profile, with internal state in Application Support/state.json. Secret metadata is device-local and scoped by Profile UUID; Keychain values and device-bound bookmarks are not exported. ApplicationStorageMigrator converts predecessor JSON catalogs and preferences, including the actual `chatgpt.agentHostID` key. Ignored `chatgpt.installationId`, `api.url`, retired voice/theme keys, and framework preferences are not activated or swept.
 
 Startup adopts the legacy global policy, service preferences, provider catalog, and remote agent configuration into the active Profile's state directory. It verifies new copies before removing their sources; an existing Profile file takes precedence over its global predecessor. The optional app-state flag suppresses the old global policy, service preference, and provider migrations after adoption. A Profile without one of these files uses defaults: no providers or default model, ask-by-default policies, no service names, no remote agents. The service manager, provider registry and remote agent directory reload them after startup preparation and on every Profile switch. Profile packages include these four files. Older builds do not read them from Profile storage; downgrade is not configuration-compatible.
 
-The agent accesses one virtual `app/` mount. settings.json, providers.json, and services.json accept bounded validated edits through their owners, requiring current revisions, normal filesystem policy, and existing semantic Action approval. Provider definitions and default-model changes must be separate writes. policy.json is read-only. status.json and exact-action views under actions/ are generated on demand, not persisted copies. Secret metadata, bookmarks, installation identity, state.json, and host.json are not mounted; status exposes only Host access. Logs are a separate redacted approval-gated JSONL view, readable/searchable only by explicitly naming app/logs.jsonl, never by directory-wide content searches. App files cannot be attached, deleted, moved, or copied; temporary conversations cannot mutate them. A preexisting physical Profile app path retains its user-file access and disables the virtual app mount for that Profile; no collision bytes are moved or hidden. The ox.app function namespace and its aliases are removed; historical Action identifiers remain policy keys for equivalent filesystem operations.
+The agent accesses one virtual `app/` mount. settings.json, providers.json, and services.json accept bounded validated edits through their owners, requiring current revisions, normal filesystem policy, and existing semantic Action approval. Provider definitions and default-model changes must be separate writes. policy.json is read-only. status.json and exact-action views under actions/ are generated on demand, not persisted copies. Secret metadata, bookmarks, installation identity, state.json, and host.json are not mounted; status exposes only Allow Connections. Logs are a separate redacted approval-gated JSONL view, readable/searchable only by explicitly naming app/logs.jsonl, never by directory-wide content searches. App files cannot be attached, deleted, moved, or copied; temporary conversations cannot mutate them. A preexisting physical Profile app path retains its user-file access and disables the virtual app mount for that Profile; no collision bytes are moved or hidden. The ox.app function namespace and its aliases are removed; historical Action identifiers remain policy keys for equivalent filesystem operations.
 
 The predecessor preference behavior below describes migration sources.
 
@@ -570,9 +570,9 @@ HTML artifacts remain ordinary UTF-8 files. Presentation creates a fresh
 non-persistent WebKit store and reads the current artifact plus bounded sibling
 media through `ox-artifact:` URLs. Maps use `<ox-map>` and `<ox-marker>`. The
 renderer itself does not add durable website state. Canvas service calls use the
-Host's existing service accounts. Canvas owns no conversation, attachment list, or permission
+Ox's existing service accounts. Canvas owns no conversation, attachment list, or permission
 store. Service-produced files live in a presentation-owned temporary directory,
-are bounded by the Host, and are deleted on close.
+are bounded by Ox, and are deleted on close.
 
 Shoveler cards persist an optional artifact filename in the conversation transcript.
 Opening a card resolves that reference in the active Profile and uses the same
@@ -681,7 +681,7 @@ Schedules are a version 1 Pi Durable session-scoped document, `ox.schedules`, in
 each Profile's `.ox/state.sqlite`. Its ID-keyed records hold prompt definitions,
 recurrence, optional condition/deadline and conversation references, execution
 state, and bounded run outcomes. A revision protects writes from stale snapshots;
-native mutation intent is serialized before committing. The Host owns execution
+native mutation intent is serialized before committing. Ox owns execution
 and observes a cache scoped to the active Profile; switching Profiles unloads it.
 
 Profile milestone `2026-10-20-schedules` gates older readers before database access.
@@ -696,8 +696,8 @@ Unknown/malformed legacy data isolates scheduling and retains the source for ret
 
 Profile exports include schedules in the database. Import remaps Profile ownership,
 pauses active/running schedules, and clears old conversation links. Opening on a
-different Host also pauses active schedules; explicit resumption is required.
-Moving a Profile on the same Host retains its schedules. Conversation forks do not
+different device also pauses active schedules; explicit resumption is required.
+Moving a Profile on the same device retains its schedules. Conversation forks do not
 copy the session-scoped document. Profile removal removes its schedule ownership.
 
 Only schedules in the active Profile execute; inactive-Profile schedules stay due.
@@ -705,7 +705,7 @@ A persisted running token claims each occurrence before execution. The run uses
 an existing idle conversation when explicitly selected, or creates an unselected
 persisted conversation. Its conversation UUID is saved before submission. The
 active run alone can mark its own condition complete. Pause, deletion, expiry, and
-Host shutdown cancel active checks. Failed or interrupted runs pause for review;
+App shutdown cancel active checks. Failed or interrupted runs pause for review;
 restart never silently replays an uncertain effect. Missed intervals coalesce into
 one check; the next interval starts after completion. One-time schedules complete
 after success. Deadlines are enforced before claiming and during execution. iOS
@@ -896,7 +896,7 @@ app-wide index, so after a downgrade credentials appear missing until they are
 entered again.
 
 Allow Connections belongs to each Profile: `Configuration/profiles/<Profile UUID>/host.json`
-is format 1 with `format` and `allowConnections`, defaulting off when absent. The Host
+is format 1 with `format` and `allowConnections`, defaulting off when absent. Ox
 serves remote clients only while the active Profile allows it. `profile.connectionScope`
 moves the predecessor app-wide `Configuration/host.json` into the active Profile
 (write, verify, delete); its value replaces the Profile's. The legacy

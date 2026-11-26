@@ -27,7 +27,7 @@ while [ "$#" -gt 0 ]; do
       echo '--ios-only: agent bundle and unsigned iOS build.'
       echo '--macos-only: agent bundle and unsigned macOS build.'
       echo '--standalone-only: standalone CLI checks for the current platform.'
-      echo 'No live Hosts, model calls, credentials, or publication.'
+      echo 'No live Profiles, model calls, credentials, or publication.'
       exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
@@ -57,7 +57,7 @@ case "$workflow" in
     steps=(environment install lint build test drift standalone build:ios build:macos) ;;
 esac
 
-unset OX_HOST_ENDPOINT OX_DEBUG_ENDPOINT OX_SERVER_ROOT OX_QA_DEVICE
+unset OX_PROFILE_ENDPOINT OX_HOST_ENDPOINT OX_DEBUG_ENDPOINT OX_SERVER_ROOT OX_QA_DEVICE
 echo "CI workflow=$workflow environment=$environment steps=${steps[*]}"
 trap '
   code=$?
@@ -76,7 +76,7 @@ for step in "${steps[@]}"; do
       git diff --exit-code -- apps/shared/Resources/OxServices.bundle \
         apps/shared/Resources/ModelServiceActions.json \
         packages/agent/skills/evolve/references/model-schemas.md
-      echo 'PASS lint, build, and test (storage upgrades and live Host checks not run)' ;;
+      echo 'PASS lint, build, and test (storage upgrades and live Profile checks not run)' ;;
     standalone)
       if [ -n "$output" ]; then
         bun --no-env-file run --cwd apps/cli standalone:check --out "$output"

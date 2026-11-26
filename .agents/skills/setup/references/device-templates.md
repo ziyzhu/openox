@@ -4,9 +4,9 @@
 with declarative on-device data. `--app <Ox.app>` reuses a matching Debug Simulator
 artifact; `bun run sim:bootstrap --device ox-N --template <json>` applies to the
 installed artifact and relaunches it. Reserve the target first. Setup uses a local
-startup file, not Host access or a model call; Release and physical builds cannot
+startup file, not Allow Connections or a model call; Release and physical builds cannot
 apply templates. `--loopback` only opts into Debug localhost ingress and does not
-turn on Allow Connections; `settings.allowHostConnections` sets it on the selected Profile, or the startup Profile without a selection.
+turn on Allow Connections; `settings.allowConnections` sets it on the selected Profile, or the startup Profile without a selection.
 
 The TypeScript contract is [`scripts/template-schema.ts`](../scripts/template-schema.ts); [`templates/basic.json`](../templates/basic.json)
 is a runnable example. `--schema` prints JSON Schema directly from that contract.
@@ -39,7 +39,7 @@ explicit bindings support exact credential state. Never put credentials in track
 JSON or pass their values as arguments.
 
 `bun run sim:website-export --device ox-N --output /private/path/session.snapshot`
-captures cookies/local storage from an already reachable authorized Host. A template
+captures cookies/local storage from an already reachable authorized Profile. A template
 can restore `websiteState: { "restoreFrom": "/private/path/session.snapshot" }`.
 Restoration replaces those app-wide data types, leaves IndexedDB unchanged, and does
 not prove authentication: verify required websites after restoring. Sessions can

@@ -7,18 +7,18 @@ nonisolated struct RenderedConversationPrompt: Decodable, Sendable {
 }
 
 nonisolated enum ConversationPromptState {
-    static func system(memory: String, hostID: String, profileID: String) -> JSONValue {
-        .object(["memory": .string(memory), "hostContext": hostContext(hostID: hostID, profileID: profileID)])
+    static func system(memory: String, deviceID: String, profileID: String) -> JSONValue {
+        .object(["memory": .string(memory), "deviceContext": deviceContext(deviceID: deviceID, profileID: profileID)])
     }
 
-    private static func hostContext(hostID: String, profileID: String) -> JSONValue {
-        let scope: [String: JSONValue] = ["hostID": .string(hostID), "profileID": .string(profileID)]
-        var host = scope
-        host["functions"] = .array((OxFunctionCatalog.build().objectValue ?? [:]).keys.sorted().map(JSONValue.string))
-        host["serviceKinds"] = .array(["web", "api", "ios", "mcp"].map(JSONValue.string))
-        host["presentation"] = .string("conversation-bubbles")
-        host["externalFiles"] = .bool(true)
-        return .object(["active": .object(scope), "hosts": .array([.object(host)])])
+    private static func deviceContext(deviceID: String, profileID: String) -> JSONValue {
+        let scope: [String: JSONValue] = ["deviceID": .string(deviceID), "profileID": .string(profileID)]
+        var device = scope
+        device["functions"] = .array((OxFunctionCatalog.build().objectValue ?? [:]).keys.sorted().map(JSONValue.string))
+        device["serviceKinds"] = .array(["web", "api", "ios", "mcp"].map(JSONValue.string))
+        device["presentation"] = .string("conversation-bubbles")
+        device["externalFiles"] = .bool(true)
+        return .object(["active": .object(scope), "devices": .array([.object(device)])])
     }
 
     static func turn(
@@ -31,7 +31,7 @@ nonisolated enum ConversationPromptState {
         isTemporary: Bool,
         responseLanguage: JSONValue,
         children: [ChildConversationSnapshot],
-        hostID: String,
+        deviceID: String,
         profileID: String
     ) -> JSONValue {
         .object([
@@ -42,7 +42,7 @@ nonisolated enum ConversationPromptState {
                 if let description = service.description { fields["description"] = .string(description) }
                 return .object(fields)
             }),
-            "hostContext": hostContext(hostID: hostID, profileID: profileID),
+            "deviceContext": deviceContext(deviceID: deviceID, profileID: profileID),
             "filePaths": .array(filePaths.map(JSONValue.string)),
             "fileRoots": .array(fileRoots.map(JSONValue.string)),
             "grantedFolders": .array(grantedFolders.map { .object(["path": .string("mounts/\($0.id)"), "name": .string($0.name)]) }),

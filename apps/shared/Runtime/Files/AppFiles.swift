@@ -112,12 +112,13 @@ extension Conversation {
             let model = try await appDefaultModel(purpose: purpose)
             let repositories = try await appRepositories(purpose: purpose)
             await RemoteAgentDirectory.shared.refreshUnknown()
+            let connections = JSONValue.object(["allowConnections": .bool(try scope.profileID.map(ConnectionSettings.load(for:))?.allowConnections ?? false)])
             return try Self.appConfigurationText(JSONValue.object([
                 "agents": RemoteAgentDirectory.shared.appInformation,
                 "app": info ?? .null, "profiles": profiles ?? .null,
                 "notifications": notifications ?? .null, "language": language ?? .null,
                 "defaultModel": model ?? .null, "repositories": repositories ?? .null,
-                "host": .object(["allowConnections": .bool(try scope.profileID.map(ConnectionSettings.load(for:))?.allowConnections ?? false)]),
+                "connections": connections, "host": connections,
             ]))
         case "app/logs.jsonl":
             try await requireApproval(action: Actions.appLogs, purpose: "Read Profile diagnostic logs")
