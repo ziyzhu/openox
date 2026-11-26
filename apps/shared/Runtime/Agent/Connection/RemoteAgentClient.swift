@@ -41,6 +41,8 @@ final class RemoteAgentClient {
     private var toolHandlers: [String: ToolHandler] = [:]
     private var opened: Set<String> = []
     private var applied: [String: RemoteAgentSelection] = [:]
+    var onConnect: (@MainActor () -> Void)?
+    var onDisconnect: (@MainActor (String) -> Void)?
 
     init(endpoint: URL) {
         self.endpoint = endpoint
@@ -103,9 +105,14 @@ final class RemoteAgentClient {
 
     private func receive(on task: URLSessionWebSocketTask) {
         Task { @MainActor [weak self] in
+            var connected = false
             while true {
                 do {
                     let message = try await task.receive()
+                    if !connected {
+                        connected = true
+                        self?.onConnect?()
+                    }
                     let data: Data = switch message {
                     case .data(let value): value
                     case .string(let value): Data(value.utf8)
@@ -184,6 +191,7 @@ final class RemoteAgentClient {
         let failed = pending
         pending.removeAll()
         for entry in failed.values { entry.continuation.resume(throwing: RemoteAgentError.disconnected(reason)) }
+        onDisconnect?(reason)
         for listener in listeners.values.flatMap(\.values) { listener(.disconnected(reason)) }
     }
 }

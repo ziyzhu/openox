@@ -13,8 +13,8 @@ nonisolated struct RemoteAgentConfiguration: Codable, Equatable, Sendable {
     var agents: [RemoteAgent] = []
     var defaultEndpoint: URL?
 
-    static func load() -> Self {
-        guard let data = try? Data(contentsOf: AppStoragePaths.remoteAgentConfiguration) else { return Self() }
+    static func load(from url: URL = AppStoragePaths.remoteAgentConfiguration) -> Self {
+        guard let data = try? Data(contentsOf: url) else { return Self() }
         do {
             let value = try JSONDecoder().decode(Self.self, from: data)
             guard value.format == 1 else { throw StorageMigrationError.invalidApplicationStorage("Remote agent configuration") }
@@ -23,6 +23,11 @@ nonisolated struct RemoteAgentConfiguration: Codable, Equatable, Sendable {
             Log.agent.error("RemoteAgentConfiguration.load failed error=\(error.localizedDescription)")
             return Self()
         }
+    }
+
+    @concurrent static func defaultAgentName(in scope: ProfileScope) async -> String? {
+        let configuration = load(from: scope.stateRoot.appendingPathComponent("remote-agents.json", isDirectory: false))
+        return configuration.defaultEndpoint.flatMap { endpoint in configuration.agents.first { $0.endpoint == endpoint }?.name }
     }
 
     func validated() throws -> Self {
@@ -123,8 +128,22 @@ final class RemoteAgentDirectory {
     func client(for endpoint: URL) -> RemoteAgentClient {
         if let client = clients[endpoint] { return client }
         let client = RemoteAgentClient(endpoint: endpoint)
+        client.onConnect = { [weak self] in self?.markConnected(endpoint) }
+        client.onDisconnect = { [weak self] reason in self?.markDisconnected(endpoint, reason: reason) }
         clients[endpoint] = client
         return client
+    }
+
+    private func markConnected(_ endpoint: URL) {
+        guard case .offline = statuses[endpoint] else { return }
+        Log.agent.info("RemoteAgentDirectory.connected endpoint=\(endpoint.absoluteString)")
+        Task { await refresh(endpoint) }
+    }
+
+    private func markDisconnected(_ endpoint: URL, reason: String) {
+        guard statuses[endpoint]?.isOnline == true else { return }
+        statuses[endpoint] = .offline(reason)
+        Log.agent.info("RemoteAgentDirectory.disconnected endpoint=\(endpoint.absoluteString)")
     }
 
     @discardableResult
