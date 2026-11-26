@@ -136,13 +136,10 @@ Agent machine limits:
   folders.json          set by `ox agent serve --directory` and `ox agent folders` on that machine
 + folders.add/remove    accepted over loopback only; Hosts read folders, never change them
 + conversations.new     result + cwd; the Host stores it on RemoteAgentBinding
-  serve --tools         limit of pi built-in tools (read, bash, edit, write, grep, find, ls), reported in agent.describe.tools
-  context.agentTools    the Host's per-conversation selection, sent with every context; the Ox extension applies it with pi.setActiveTools on the next turn and blocks built-ins outside it
-  context.confirmTools  tools whose every call asks through ctx.ui.confirm → conversations.prompt → the app
-  Shell                 Off / Ask each time / On per conversation, default Ask; offered only when serve allows bash; conversations from before this keep pi's defaults
+  tools                 pi's own defaults; no agent-side tool permissions for now
 ```
 
-The built-in agent gets no shell; it delegates shell work with `ox.conversation.start({ agent })`. A remote machine's folders are not mounted into `ox.fs` for now.
+The built-in agent gets no shell; it delegates shell work with `ox.conversation.start({ agent })`. A per-conversation tool selection and approval prompts were built and removed (reverting c6bc1f3c); pi's `pi.setActiveTools` and a `tool_call` handler calling `ctx.ui.confirm` are the hooks if this returns. A remote machine's folders are not mounted into `ox.fs` for now.
 
 Device-bound values belong to a Profile but stay in device storage, keyed by `profileId`; the Profile folder holds only names and IDs, since it can be synced or exported.
 
@@ -166,7 +163,7 @@ Website data moves between Profiles and devices with `WKWebsiteDataStore.fetchDa
 Order:
 
 1. Done: folders writable only over loopback; `cwd` in `conversations.new`.
-2. Done: tool limit, `agentTools` and `confirmTools` in context, Shell picker.
+2. Dropped for now: agent-side tool permissions.
 3. Done: per-Profile secrets (prefixed Keychain accounts) and website logins (store per Profile), migrated to the Profile selected at upgrade.
 4. Website data export and import with `fetchData`/`restoreData`, after a device check of what restores.
 5. Move policy, services, providers and remote agents into the Profile (storage migration).

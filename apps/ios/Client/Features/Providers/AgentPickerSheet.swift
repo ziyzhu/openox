@@ -183,25 +183,6 @@ struct RemoteAgentModelPicker<Header: View>: View {
                     }
                     .settingsSurface()
                 }
-                if agents.allowsShell(endpoint) {
-                    VStack(spacing: 0) {
-                        Menu {
-                            ForEach(ShellAccess.allCases, id: \.self) { access in
-                                Button { conversation.selectRemoteShell(access) } label: {
-                                    Label { Text(Self.shellName(access)); Text(Self.shellDetail(access)) } icon: {
-                                        if access == conversation.remoteAgent?.shell { Image(systemName: "checkmark") }
-                                    }
-                                }
-                                .accessibilityIdentifier(A11yID.ConversationControls.agentShellOption(access.rawValue))
-                            }
-                        } label: {
-                            SettingsDisclosureRow(title: "Shell", value: Text(conversation.remoteAgent?.shell.map { Self.shellName($0) } ?? "Agent default"),
-                                                  indicator: "chevron.up.chevron.down")
-                        }
-                        .accessibilityIdentifier(A11yID.ConversationControls.agentShellMenu)
-                    }
-                    .settingsSurface()
-                }
                 if case .offline(let error) = agents.statuses[endpoint] {
                     SettingsErrorMessage(message: String(localized: "\(agents.displayName(for: endpoint)) is offline: \(error)"),
                                          systemImage: "exclamationmark.circle.fill")
@@ -217,22 +198,6 @@ struct RemoteAgentModelPicker<Header: View>: View {
             ToolbarItem(placement: .topBarLeading) {
                 SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ConversationControls.modelClose, action: onClose)
             }
-        }
-    }
-
-    private static func shellName(_ access: ShellAccess) -> LocalizedStringKey {
-        switch access {
-        case .off: "Off"
-        case .ask: "Ask each time"
-        case .on: "On"
-        }
-    }
-
-    private static func shellDetail(_ access: ShellAccess) -> LocalizedStringKey {
-        switch access {
-        case .off: "Files only, no commands"
-        case .ask: "Approve each command in Ox"
-        case .on: "Run commands without asking"
         }
     }
 

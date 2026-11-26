@@ -7,16 +7,15 @@ import { AgentClient, agentEndpoint } from "./agent-client.ts";
 import { keepAwake } from "./agent-awake.ts";
 import { agentLog } from "./agent-log.ts";
 import { piExecutable, type Approval } from "./agent-pi.ts";
-import { AgentServer, PI_BUILTIN_TOOLS } from "./agent-serve.ts";
+import { AgentServer } from "./agent-serve.ts";
 import { ensurePortFree, publish, tailnetIdentity, tailscaleBinary, type Tailnet } from "./agent-tailscale.ts";
 import { fail, type SubCommand } from "./lib.ts";
 
-const SERVE_USAGE = `Usage: ox agent serve [--port ${AGENT_DEFAULT_PORT}] [--directory <folder>]... [--tools <list>] [--local] [--allow-sleep] [--approve | --no-approve]
+const SERVE_USAGE = `Usage: ox agent serve [--port ${AGENT_DEFAULT_PORT}] [--directory <folder>]... [--local] [--allow-sleep] [--approve | --no-approve]
 
 Publishes wss://<this machine>.ts.net:<port> through Tailscale Serve to this machine's owner by default.
   --directory <folder>  Authorize a folder for conversations (repeatable; --cwd is an alias); authorized folders persist
   Conversations started without a folder get their own working folder in the agent's state directory.
-  --tools <list>        pi built-in tools Hosts may turn on, comma-separated (default: ${PI_BUILTIN_TOOLS.join(",")})
   --local               Loopback only at ws://127.0.0.1:<port>; do not publish through Tailscale
   --allow-sleep         Let macOS idle-sleep while serving`;
 const DESCRIBE_USAGE = `Usage: ox agent describe [--endpoint ws://127.0.0.1:${AGENT_DEFAULT_PORT}] [--json]`;
@@ -37,7 +36,6 @@ async function serve(args: string[]): Promise<void> {
     port: { type: "string" },
     directory: { type: "string", multiple: true },
     cwd: { type: "string" },
-    tools: { type: "string" },
     local: { type: "boolean" },
     "allow-sleep": { type: "boolean" },
     approve: { type: "boolean" },
@@ -54,13 +52,11 @@ async function serve(args: string[]): Promise<void> {
   if (port === 0 && !values.local) fail("--port 0 needs --local; Tailscale Serve publishes a fixed port");
   const requested = [...(values.directory ?? []), ...(values.cwd ? [values.cwd] : [])];
   const folders = [...new Set(await Promise.all(requested.map(workspaceRoot)))];
-  const tools = values.tools === undefined ? undefined : toolLimit(values.tools);
   const approval: Approval = values.approve ? "approve" : values["no-approve"] ? "no-approve" : "default";
   const publication = await preparePublication(values.local === true, port);
   const awake = values["allow-sleep"] ? undefined : keepAwake();
   const server = await AgentServer.start({
     folders,
-    tools,
     approval,
     executable: piExecutable(),
     stateDirectory: process.env.OX_AGENT_STATE_DIR ?? join(homedir(), ".ox", "agent-serve"),
@@ -104,12 +100,6 @@ async function preparePublication(local: boolean, port: number): Promise<Publica
   } catch (error) {
     return fail((error as Error).message);
   }
-}
-
-function toolLimit(list: string): string[] {
-  const tools = [...new Set(list.split(",").map((tool) => tool.trim()).filter(Boolean))];
-  const unknown = tools.filter((tool) => !(PI_BUILTIN_TOOLS as readonly string[]).includes(tool));
-  return unknown.length ? fail(`--tools: unknown ${unknown.join(", ")}; choose from ${PI_BUILTIN_TOOLS.join(",")}`) : tools;
 }
 
 async function workspaceRoot(path: string): Promise<string> {

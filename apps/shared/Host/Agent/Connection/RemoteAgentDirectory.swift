@@ -83,7 +83,6 @@ final class RemoteAgentDirectory {
     private(set) var configuration: RemoteAgentConfiguration
     private(set) var statuses: [URL: RemoteAgentStatus] = [:]
     private(set) var models: [URL: [RemoteAgentModel]] = [:]
-    private(set) var tools: [URL: [String]] = [:]
     private(set) var defaultModels: [URL: AgentModelReference] = [:]
     private(set) var defaultThinkingLevels: [URL: String] = [:]
     @ObservationIgnored private var clients: [URL: RemoteAgentClient] = [:]
@@ -147,7 +146,6 @@ final class RemoteAgentDirectory {
             unregisterPush(endpoint)
             statuses[endpoint] = nil
             models[endpoint] = nil
-            tools[endpoint] = nil
             clients[endpoint] = nil
         }
         configuration = next
@@ -194,7 +192,6 @@ final class RemoteAgentDirectory {
         unregisterPush(endpoint)
         statuses[endpoint] = nil
         models[endpoint] = nil
-        tools[endpoint] = nil
         clients[endpoint] = nil
         Log.agent.info("RemoteAgentDirectory.remove endpoint=\(endpoint.absoluteString) count=\(next.agents.count)")
     }
@@ -219,7 +216,6 @@ final class RemoteAgentDirectory {
                 machine: description["machine"]?.stringValue ?? endpoint.host() ?? "",
                 folders: folders
             )
-            tools[endpoint] = description["tools"]?.arrayValue?.compactMap(\.stringValue)
             let listing = try await client.call("models.list", timeout: .seconds(30)).objectValue ?? [:]
             models[endpoint] = (listing["models"]?.arrayValue ?? []).compactMap(Self.model)
             defaultModels[endpoint] = listing["current"].flatMap(Self.reference)
@@ -263,10 +259,6 @@ final class RemoteAgentDirectory {
 
     func machine(for endpoint: URL) -> String? {
         if case .online(_, _, let machine, _) = statuses[endpoint] { machine } else { nil }
-    }
-
-    func allowsShell(_ endpoint: URL) -> Bool {
-        tools[endpoint]?.contains("bash") == true
     }
 
     func folders(for endpoint: URL) -> [String] {
