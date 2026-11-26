@@ -255,7 +255,7 @@ private struct SidebarRow: View {
                         .truncationMode(.tail)
                         .multilineTextAlignment(.leading)
                     TimelineView(.everyMinute) { context in
-                        Text(lastModifiedText(relativeTo: context.date))
+                        Text(verbatim: [lastModifiedText(relativeTo: context.date), agentName].compactMap { $0 }.joined(separator: " · "))
                             .font(Theme.Fonts.bodySm)
                             .foregroundStyle(Theme.Colors.onSurfaceMuted)
                             .lineLimit(1)
@@ -264,12 +264,6 @@ private struct SidebarRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: Theme.Spacing.sm) {
                     activityIndicator
-                    if meta.remoteAgent != nil {
-                        Image(systemName: "terminal")
-                            .font(.system(.body, weight: .medium))
-                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                            .accessibilityHidden(true)
-                    }
                     if meta.scheduleID != nil {
                         Image(systemName: "clock")
                             .font(.system(.body, weight: .medium))
@@ -283,6 +277,10 @@ private struct SidebarRow: View {
         .accessibilityLabel(meta.displayTitle)
         .accessibilityValue(accessibilityValue)
         .accessibilityIdentifier(A11yID.Sidebar.row(meta.id.uuidString))
+    }
+
+    private var agentName: String? {
+        meta.remoteAgent.map { RemoteAgentDirectory.shared.displayName(for: $0.endpoint) }
     }
 
     private func lastModifiedText(relativeTo now: Date) -> String {
@@ -299,8 +297,7 @@ private struct SidebarRow: View {
     private var accessibilityValue: String {
         let activity = activityAccessibilityValue
         let lastModified = lastModifiedText(relativeTo: Date())
-        let agent = meta.remoteAgent.map { RemoteAgentDirectory.shared.displayName(for: $0.endpoint) } ?? ""
-        return [favoriteAccessibilityValue, agent, lastModified, scheduledAccessibilityValue, activity]
+        return [favoriteAccessibilityValue, agentName ?? "", lastModified, scheduledAccessibilityValue, activity]
             .filter { !$0.isEmpty }
             .joined(separator: ", ")
     }

@@ -252,7 +252,9 @@ final class RemoteAgentDirectory {
     }
 
     func displayName(for endpoint: URL) -> String {
-        agent(for: endpoint)?.name ?? endpoint.host() ?? endpoint.absoluteString
+        if let name = agent(for: endpoint)?.name { return name }
+        guard let host = endpoint.host() else { return endpoint.absoluteString }
+        return host.hasSuffix(".ts.net") ? String(host.prefix { $0 != "." }) : host
     }
 
     func machine(for endpoint: URL) -> String? {
