@@ -10,14 +10,14 @@ import Synchronization
 nonisolated final class DurableRuntime: @unchecked Sendable {
     typealias NativeHandler = @Sendable (String, JSONValue, @escaping @Sendable (JSONValue) -> Void) async throws -> JSONValue
     private let nativeHandler: NativeHandler?
-    private let queue = DispatchQueue(label: "ox.durable.javascript", qos: .userInitiated)
+    private static let thread = VirtualMachineThread.started(name: "durable-javascript")
     private let nativeQueue = DispatchQueue(label: "ox.durable.native", qos: .userInitiated)
     private let database: DurableDatabase
     private let files: DurableFileStore?
     private let storageDiagnostics: Bool
     private var context: JSContext?
     private struct TimerHandle {
-        let work: DispatchWorkItem
+        let timer: CFRunLoopTimer
         let callback: JSValue
     }
     private var timers: [Int: TimerHandle] = [:]
@@ -39,7 +39,7 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
         let entries = storageDiagnostics ? ["storageConformance", "storageBenchmark"] : ["agentCommand"]
         guard entries.contains(entry) else { throw failure("Unavailable trusted entry point") }
         return try await withCheckedThrowingContinuation { continuation in
-            queue.async { [self] in
+            Self.thread.perform { [self] in
                 do {
                     if let fatalError { throw failure(fatalError) }
                     if context == nil { try install() }
@@ -169,7 +169,7 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
     /// Only after Harness.close() has joined all invocations and closed its connection.
     func dispose() async {
         await withCheckedContinuation { continuation in
-            queue.async { [self] in
+            Self.thread.perform { [self] in
                 fatalError = "Durable runtime closed; reacquire after reopening"
                 for call in calls.values { call.resume(throwing: failure(fatalError!)) }
                 calls.removeAll()
@@ -226,14 +226,13 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
             guard let self else { return 0 }
             self.nextTimerID += 1
             let id = self.nextTimerID
-            // Only the live timer table retains JSValue. Scheduled work captures no context/callback;
-            // clearing a long timer releases its callback immediately, not at the scheduled deadline.
-            let work = DispatchWorkItem { [weak self] in
+            let fireDate = CFAbsoluteTimeGetCurrent() + max(0.001, ms / 1000)
+            let timer = CFRunLoopTimerCreateWithHandler(nil, fireDate, 0, 0, 0) { [weak self] _ in
                 guard let self, let timer = self.timers.removeValue(forKey: id) else { return }
                 timer.callback.call(withArguments: [])
-            }
-            self.timers[id] = TimerHandle(work: work, callback: callback)
-            self.queue.asyncAfter(deadline: .now() + max(0.001, ms / 1000), execute: work)
+            }!
+            self.timers[id] = TimerHandle(timer: timer, callback: callback)
+            CFRunLoopAddTimer(CFRunLoopGetCurrent(), timer, .defaultMode)
             return id
         }
         let clear: @convention(block) (Int) -> Void = { [weak self] id in self?.clearTimer(id) }
@@ -281,7 +280,7 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
 
     private func clearTimer(_ id: Int) {
         guard let timer = timers.removeValue(forKey: id) else { return }
-        timer.work.cancel()
+        CFRunLoopTimerInvalidate(timer.timer)
     }
 
     private func performNative(id: Int, json: String) {
@@ -303,7 +302,7 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
             default:
                 guard let nativeHandler else { throw failure("Unavailable native capability") }
                 let params = JSONValue.from(params)
-                queue.async { [weak self] in
+                Self.thread.perform { [weak self] in
                     guard let self else { return }
                     guard !self.cancelledIDs.contains(id) else { self.finish(id, json: "null", error: "Native operation cancelled"); return }
                     self.tasks[id] = Task { [weak self] in
@@ -319,7 +318,7 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
 
     private func stream(_ id: Int, event: JSONValue) {
         let json = event.jsonString()
-        queue.async { [weak self] in
+        Self.thread.perform { [weak self] in
             guard let self, self.tasks[id] != nil, !self.cancelledIDs.contains(id) else { return }
             self.context?.objectForKeyedSubscript("OxDurable")?.invokeMethod("streamEvent", withArguments: [id, json])
         }
@@ -330,7 +329,7 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
         catch { finish(id, json: "null", error: error.localizedDescription) }
     }
     private func finish(_ id: Int, json: String, error: String?) {
-        queue.async { [weak self] in
+        Self.thread.perform { [weak self] in
             guard let self else { return }
             self.tasks.removeValue(forKey: id)
             self.cancelledIDs.remove(id)

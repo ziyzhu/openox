@@ -45,6 +45,9 @@ final class IOSHost: OxHost {
                     self?.conversations.notifyPendingInteractions()
                 }
             },
+            NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.conversations.releaseInactive() }
+            },
         ]
         executionAvailabilityChanged()
     }

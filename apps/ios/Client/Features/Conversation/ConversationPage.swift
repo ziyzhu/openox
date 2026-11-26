@@ -261,9 +261,10 @@ struct ConversationPage: View {
         .environment(\.conversationFileResolver, ConversationFileResolver(
             conversationID: conversation.id,
             revision: conversation.filesRevision,
-            resolve: { [conversation] path in await conversation.messageFile(path: path) },
-            read: { [conversation] path in
-                try await conversation.fileBackend(operation: "read", path: path, arguments: .object([:]))
+            resolve: { [weak conversation] path in await conversation?.messageFile(path: path) },
+            read: { [weak conversation] path in
+                guard let conversation else { throw CancellationError() }
+                return try await conversation.fileBackend(operation: "read", path: path, arguments: .object([:]))
             }
         ))
     }

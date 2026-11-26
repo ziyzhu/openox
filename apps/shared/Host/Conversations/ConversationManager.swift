@@ -1140,22 +1140,32 @@ final class ConversationManager {
                 Log.session.warning("ConversationManager.evict deferred loaded=\(records.values.compactMap { $0.hydration.conversation }.count)")
                 return
             }
-            let id = candidate.key
-            var record = candidate.value
-            guard !record.persistence.isDirty, let conversation = record.hydration.conversation else {
-                if case .debouncing(let request, let task) = record.persistence {
-                    task.cancel()
-                    beginSave(id, expected: request.saveID)
-                }
-                return
-            }
-            let meta = conversation.metadata
-            conversation.release(cancelling: false)
-            record.hydration = .unloaded(meta)
-            records[id] = record
-            accessOrdinals[id] = nil
-            Log.session.info("ConversationManager.evict id=\(id)")
+            guard evict(candidate.key) else { return }
         }
+    }
+
+    func releaseInactive() {
+        let inactive = records.filter { $0.key.rawValue != currentId && $0.value.hydration.conversation.map { !$0.isBusy && !$0.isTemporary } == true }.map(\.key)
+        let released = inactive.filter { evict($0) }.count
+        Log.session.info("ConversationManager.releaseInactive released=\(released) deferred=\(inactive.count - released) loaded=\(records.values.compactMap { $0.hydration.conversation }.count)")
+    }
+
+    private func evict(_ id: ConversationID) -> Bool {
+        guard var record = records[id] else { return false }
+        guard !record.persistence.isDirty, let conversation = record.hydration.conversation else {
+            if case .debouncing(let request, let task) = record.persistence {
+                task.cancel()
+                beginSave(id, expected: request.saveID)
+            }
+            return false
+        }
+        let meta = conversation.metadata
+        conversation.release(cancelling: false)
+        record.hydration = .unloaded(meta)
+        records[id] = record
+        accessOrdinals[id] = nil
+        Log.session.info("ConversationManager.evict id=\(id)")
+        return true
     }
 
 }

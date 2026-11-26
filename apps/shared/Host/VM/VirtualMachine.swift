@@ -6,14 +6,16 @@ nonisolated final class VirtualMachineThread: Thread, @unchecked Sendable {
     private(set) var runLoop: CFRunLoop?
     private let ready = DispatchSemaphore(value: 0)
 
-    static let shared: VirtualMachineThread = {
+    static let shared = started(name: "agent-javascript")
+
+    static func started(name: String) -> VirtualMachineThread {
         let t = VirtualMachineThread()
-        t.name = "agent-javascript"
+        t.name = name
         t.qualityOfService = .userInitiated
         t.start()
         t.ready.wait()
         return t
-    }()
+    }
 
     override func main() {
         runLoop = CFRunLoopGetCurrent()
