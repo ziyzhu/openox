@@ -109,7 +109,6 @@ struct ConversationPage: View {
 
     @State private var copiedBlockId: UUID?
     @State private var toast: Toast?
-    @State private var messageFiles: [FileItem] = []
     @State private var choiceInputFocused = false
     @State private var showsDelayedActivity = false
 
@@ -301,7 +300,7 @@ struct ConversationPage: View {
             .task(id: MessageFilesKey(conversation: conversation.id, blocks: conversation.transcriptBlockCount,
                                       isBusy: conversation.isBusy, files: conversation.filesRevision)) {
                 guard !conversation.isBusy else { return }
-                messageFiles = await conversation.messageFiles()
+                await conversation.refreshMessageFiles()
             }
             .safeAreaBar(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {
@@ -775,7 +774,7 @@ struct ConversationPage: View {
 
     private var conversationFiles: [FileItem] {
         var seen = Set<String>()
-        return (messageFiles + conversation.referencedFiles).filter { seen.insert($0.fileName.lowercased()).inserted }
+        return (conversation.messageFiles + conversation.referencedFiles).filter { seen.insert($0.fileName.lowercased()).inserted }
     }
 
     private struct MessageFilesKey: Equatable {

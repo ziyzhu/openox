@@ -587,6 +587,7 @@ final class Conversation: Identifiable {
     }
 
     private(set) var filesRevision = 0
+    var messageFiles: [FileItem] = []
     @ObservationIgnored private var filesRefreshTask: Task<Void, Never>?
     @ObservationIgnored private var referencedFilesCache: ReferencedFilesCache?
     var transcript: [Block] { document.projection }
@@ -1252,13 +1253,6 @@ final class Conversation: Identifiable {
     ) async throws {
         try await requireWritableFileAction(action, args: args)
         try await interactions.requireApproval(action: action, defaultPolicy: defaultPolicy, args: args, purpose: purpose, prompt: prompt)
-    }
-
-    func requireProfileMutation(_ action: String) throws {
-        guard retention == .persisted else {
-            Log.session.info("Conversation.temporary blocked action=\(action)")
-            throw OxFunctionError(code: "profile_required", message: "\(action): Temporary conversations can't save changes.", recovery: "Ask the user to continue in a Profile stored on this device to keep this result.")
-        }
     }
 
     @discardableResult

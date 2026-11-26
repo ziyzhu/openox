@@ -313,7 +313,14 @@ extension Conversation {
         }
     }
 
-    public func messageFiles() async -> [FileItem] {
+    func refreshMessageFiles() async {
+        let files = await resolveMessageFiles()
+        guard files != messageFiles else { return }
+        Log.session.info("Conversation.messageFiles conversation=\(id) count=\(files.count)")
+        messageFiles = files
+    }
+
+    private func resolveMessageFiles() async -> [FileItem] {
         var paths: [String] = []
         for block in transcript.reversed() {
             guard case .agentContent(let items) = block.kind else { continue }
@@ -863,5 +870,12 @@ extension Conversation {
     func refreshUserSkills() {
         guard StorageRoot.currentScope?.profileID == scope.profileID else { return }
         Skills.shared.refresh()
+    }
+
+    func requireProfileMutation(_ action: String) throws {
+        guard retention == .persisted else {
+            Log.session.info("Conversation.temporary blocked action=\(action)")
+            throw OxFunctionError(code: "profile_required", message: "\(action): Temporary conversations can't save changes.", recovery: "Ask the user to continue in a Profile stored on this device to keep this result.")
+        }
     }
 }
