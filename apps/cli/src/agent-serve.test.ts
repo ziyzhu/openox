@@ -5,10 +5,11 @@ import { join } from "node:path";
 import { Value } from "typebox/value";
 import { AgentMethods, AgentSchemas } from "@openox/protocol/agent";
 import { AgentClient, AgentRPCError } from "./agent-client.ts";
+import { piCommand } from "./agent-pi.ts";
 import { AgentServer } from "./agent-serve.ts";
 import { admission } from "./agent-tailscale.ts";
 
-const executable = process.env.OX_AGENT_PI ?? Bun.which("pi");
+const pi = (() => { try { return piCommand(); } catch { return undefined; } })();
 const timeout = 60000;
 const context = { sections: { ox_test: "Always end replies with the word PINEAPPLE" } };
 const tools = [{ name: "execute", description: "Run JavaScript on the Ox Host.", parameters: { type: "object", properties: { source: { type: "string" } }, required: ["source"] } }];
@@ -35,7 +36,7 @@ beforeAll(async () => {
   await mkdir(join(root, "project", "nested"), { recursive: true });
   process.env.PI_CODING_AGENT_SESSION_DIR = join(root, "sessions");
   server = await AgentServer.start({
-    approval: "no-approve", executable: executable!, stateDirectory: join(root, "state"), port: 0,
+    approval: "no-approve", pi: pi!, stateDirectory: join(root, "state"), port: 0,
     eventLimits: { events: 4, bytes: 1024 * 1024 },
   });
   client = await AgentClient.connect(server.url);
@@ -49,7 +50,7 @@ afterAll(async () => {
   if (root) await rm(root, { recursive: true, force: true });
 }, timeout);
 
-test.skipIf(!executable)("serves pi conversations over JSON-RPC", async () => {
+test.skipIf(!pi)("serves pi conversations over JSON-RPC", async () => {
   const description = await client.request("agent.describe");
   expect(valid("AgentDescription", description)).toBe(true);
   expect(description.implementation).toMatchObject({ name: "pi" });
@@ -84,7 +85,7 @@ test.skipIf(!executable)("serves pi conversations over JSON-RPC", async () => {
   expect((await rejection(client.request("conversations.unknown"))).code).toBe(-32601);
 }, timeout * 3);
 
-test.skipIf(!executable)("creates conversations in any existing folder", async () => {
+test.skipIf(!pi)("creates conversations in any existing folder", async () => {
   const nested = await client.request<{ id: string; cwd: string }>("conversations.new", { cwd: join(root, "project", "nested"), context, tools }, timeout);
   expect(nested.cwd).toBe(join(root, "project", "nested"));
   await client.request("conversations.rename", { id: nested.id, title: "Nested" });
@@ -98,7 +99,7 @@ test.skipIf(!executable)("creates conversations in any existing folder", async (
   expect((await rejection(client.request("folders.list"))).code).toBe(-32601);
 }, timeout * 2);
 
-test.skipIf(!executable)("replays buffered events after the open result", async () => {
+test.skipIf(!pi)("replays buffered events after the open result", async () => {
   const created = await client.request<{ id: string }>("conversations.new", { context, tools }, timeout);
   for (const title of ["one", "two", "three", "four", "five", "six"]) await client.request("conversations.rename", { id: created.id, title });
   const events = notifications.filter((note) => note.method === "conversations.event" && note.params.id === created.id).map((note) => note.params.seq);
@@ -149,7 +150,7 @@ test("admits loopback processes and the tailnet owner only", () => {
   expect(check({})).toEqual({ kind: "rejected", reason: "unknown_host" });
 });
 
-test.skipIf(!executable)("serves health and rejects foreign hosts", async () => {
+test.skipIf(!pi)("serves health and rejects foreign hosts", async () => {
   const url = server.url.replace("ws://", "http://");
   expect(await (await fetch(`${url}/health`)).json()).toEqual({ name: "ox-agent", protocol: 1 });
   expect((await fetch(`${url}/health`, { headers: { host: "evil.example" } })).status).toBe(403);

@@ -1,3 +1,5 @@
+import { dirname, join } from "node:path";
+import packageMetadata from "../package.json";
 import { agentLog } from "./agent-log.ts";
 
 export type PiRecord = Record<string, unknown> & { type?: unknown };
@@ -7,19 +9,36 @@ export type Approval = "default" | "approve" | "no-approve";
 const STDERR_TAIL_BYTES = 4096;
 const SHUTDOWN_GRACE_MS = 5000;
 
-export function piExecutable(): string {
+export type PiSource = "override" | "bundled" | "path";
+export type PiCommand = { argv: string[]; source: PiSource };
+
+const PI_PACKAGE = "@earendil-works/pi-coding-agent";
+export const PI_MINIMUM_VERSION = packageMetadata.dependencies[PI_PACKAGE];
+
+export function piCommand(): PiCommand {
   const override = process.env.OX_AGENT_PI;
-  if (override) return override;
+  if (override) return { argv: [override], source: "override" };
+  const bundled = bundledPi();
+  if (bundled) return { argv: [process.execPath, bundled], source: "bundled" };
   const found = Bun.which("pi");
-  if (!found) throw new Error("pi was not found on PATH; install pi or set OX_AGENT_PI to its executable");
-  return found;
+  if (found) return { argv: [found], source: "path" };
+  throw new Error(`pi was not found; reinstall the ox CLI with npm, install pi ${PI_MINIMUM_VERSION} or later on PATH, or set OX_AGENT_PI to its executable`);
 }
 
-export async function piVersion(executable: string): Promise<string> {
-  const child = Bun.spawn({ cmd: [executable, "--version"], stdout: "pipe", stderr: "ignore", stdin: "ignore" });
+function bundledPi(): string | undefined {
+  try { return join(dirname(Bun.resolveSync(PI_PACKAGE, import.meta.dir)), "bundle", "cli.js"); }
+  catch { return undefined; }
+}
+
+export async function piVersion(pi: PiCommand): Promise<string> {
+  const child = Bun.spawn({ cmd: [...pi.argv, "--version"], stdout: "pipe", stderr: "ignore", stdin: "ignore" });
   const output = (await new Response(child.stdout).text()).trim();
-  if (await child.exited !== 0 || !output) throw new Error(`${executable} --version failed`);
-  return output.split(/\s+/).at(-1)!;
+  if (await child.exited !== 0 || !output) throw new Error(`${pi.argv.join(" ")} --version failed`);
+  const version = output.split(/\s+/).at(-1)!;
+  if (Bun.semver.order(version, PI_MINIMUM_VERSION) < 0) {
+    throw new Error(`pi ${version} (${pi.argv.join(" ")}) is older than ${PI_MINIMUM_VERSION}; ${pi.source === "override" ? "point OX_AGENT_PI at a newer pi" : "update pi"}`);
+  }
+  return version;
 }
 
 export function approvalArguments(approval: Approval): string[] {
@@ -42,14 +61,14 @@ export class PiProcess {
   private readonly onRecord: (record: PiRecord) => void;
 
   constructor(
-    executable: string,
+    pi: PiCommand,
     args: string[],
     options: { cwd: string; env?: Record<string, string>; label: string },
     onRecord: (record: PiRecord) => void,
   ) {
     this.onRecord = onRecord;
     this.child = Bun.spawn({
-      cmd: [executable, "--mode", "rpc", ...args],
+      cmd: [...pi.argv, "--mode", "rpc", ...args],
       cwd: options.cwd,
       env: { ...process.env, ...options.env },
       stdin: "pipe",

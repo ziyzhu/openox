@@ -21,7 +21,7 @@ import {
 import { DEFAULT_EVENT_LIMITS, EventLog, type EventLimits } from "./agent-events.ts";
 import { agentLog } from "./agent-log.ts";
 import { BRIDGE_ENVIRONMENT, ORIGIN_ENTRY, ORIGIN_ENVIRONMENT, writePiExtension } from "./agent-pi-extension.ts";
-import { approvalArguments, exitMessage, PiProcess, piVersion, type Approval, type PiExit, type PiRecord } from "./agent-pi.ts";
+import { approvalArguments, exitMessage, PiProcess, piVersion, type Approval, type PiCommand, type PiExit, type PiRecord } from "./agent-pi.ts";
 import type { PushKind } from "@openox/protocol/push";
 import { PushRegistry } from "./agent-push.ts";
 import { expandHome, SessionIndex, type Origin } from "./agent-sessions.ts";
@@ -31,7 +31,7 @@ import { ToolBridge } from "./agent-tools.ts";
 export type AgentSocket = ServerWebSocket<{ id: string; conversations: Set<string>; via: "loopback" | "tailnet" }>;
 export type AgentServeOptions = {
   approval: Approval;
-  executable: string;
+  pi: PiCommand;
   stateDirectory: string;
   port: number;
   tailnet?: Tailnet;
@@ -179,9 +179,9 @@ export class AgentServer {
 
   static async start(options: AgentServeOptions): Promise<AgentServer> {
     const push = new PushRegistry(options.stateDirectory);
-    const [version, extensionPath, home] = await Promise.all([piVersion(options.executable), writePiExtension(options.stateDirectory), realpath(homedir()), push.load()]);
+    const [version, extensionPath, home] = await Promise.all([piVersion(options.pi), writePiExtension(options.stateDirectory), realpath(homedir()), push.load()]);
     const server = new AgentServer(options, version, extensionPath, push, home);
-    agentLog("serve.start", { url: server.url, tailnet: options.tailnet !== undefined, pi: version, approval: options.approval });
+    agentLog("serve.start", { url: server.url, tailnet: options.tailnet !== undefined, pi: version, piSource: options.pi.source, approval: options.approval });
     return server;
   }
 
@@ -281,6 +281,14 @@ export class AgentServer {
     };
   }
 
+  async signedInProviders(): Promise<number | undefined> {
+    try { return new Set((await this.listModels()).models.map((model) => model.provider)).size; }
+    catch (error) {
+      agentLog("serve.providers_unknown", { error: (error as Error).message });
+      return undefined;
+    }
+  }
+
   private listModels() {
     if (!this.models || Date.now() - this.models.at > MODELS_CACHE_MS) {
       const value = this.fetchModels();
@@ -291,7 +299,7 @@ export class AgentServer {
   }
 
   private async fetchModels(): Promise<{ models: AgentModel[]; current: AgentModelRef | null; thinkingLevel: string | null }> {
-    const pi = new PiProcess(this.options.executable, ["--no-session", ...approvalArguments(this.options.approval)], { cwd: this.home, label: "models" }, () => {});
+    const pi = new PiProcess(this.options.pi, ["--no-session", ...approvalArguments(this.options.approval)], { cwd: this.home, label: "models" }, () => {});
     try {
       const [available, state] = await withTimeout(
         Promise.all([pi.command<{ models: Record<string, unknown>[] }>("get_available_models"), pi.command<PiState>("get_state")]),
@@ -530,7 +538,7 @@ export class AgentServer {
   private launch(conversation: Conversation, sessionArguments: string[], env: Record<string, string> = {}): Promise<PiProcess> {
     const token = randomBytes(32).toString("hex");
     const pi: PiProcess = new PiProcess(
-      this.options.executable,
+      this.options.pi,
       [...sessionArguments, "-e", this.extensionPath, ...approvalArguments(this.options.approval)],
       { cwd: conversation.cwd, env: { ...env, [BRIDGE_ENVIRONMENT]: `${this.bridgeURL}/${token}` }, label: conversation.id },
       (record) => this.receivePi(conversation, pi, record),

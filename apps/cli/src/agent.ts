@@ -5,7 +5,7 @@ import { AGENT_DEFAULT_PORT, type AgentDescription } from "@openox/protocol/agen
 import { AgentClient, agentEndpoint } from "./agent-client.ts";
 import { keepAwake } from "./agent-awake.ts";
 import { agentLog } from "./agent-log.ts";
-import { piExecutable, type Approval } from "./agent-pi.ts";
+import { piCommand, type Approval, type PiCommand } from "./agent-pi.ts";
 import { AgentServer } from "./agent-serve.ts";
 import { ensurePortFree, publish, tailnetIdentity, tailscaleBinary, type Tailnet } from "./agent-tailscale.ts";
 import { fail, type SubCommand } from "./lib.ts";
@@ -16,10 +16,14 @@ Publishes wss://<this machine>.ts.net:<port> through Tailscale Serve to this mac
 Conversations start in your home folder unless Ox names another folder.
   --local               Loopback only at ws://127.0.0.1:<port>; do not publish through Tailscale
   --allow-sleep         Let macOS idle-sleep while serving`;
+const LOGIN_USAGE = `Usage: ox agent login <provider> [--api-key] [--no-browser]
+
+Signs pi on this machine in to a model provider for ox agent serve.`;
 const DESCRIBE_USAGE = `Usage: ox agent describe [--endpoint ws://127.0.0.1:${AGENT_DEFAULT_PORT}] [--json]`;
 
 export const AGENT_COMMANDS: Record<string, SubCommand> = {
   serve: { desc: "Serve pi on this machine to Ox over WebSocket JSON-RPC, published through Tailscale Serve", fn: serve },
+  login: { desc: "Sign pi on this machine in to a model provider (--api-key, --no-browser)", fn: login },
   describe: { desc: "Show an agent endpoint's implementation, default folder and methods (--endpoint, --json)", fn: describe },
 };
 
@@ -43,11 +47,12 @@ async function serve(args: string[]): Promise<void> {
   if (!Number.isInteger(port) || port < 0 || port > 65535) fail("--port must be an integer from 0 to 65535");
   if (port === 0 && !values.local) fail("--port 0 needs --local; Tailscale Serve publishes a fixed port");
   const approval: Approval = values.approve ? "approve" : values["no-approve"] ? "no-approve" : "default";
+  const pi = resolvedPi();
   const publication = await preparePublication(values.local === true, port);
   const awake = values["allow-sleep"] ? undefined : keepAwake();
   const server = await AgentServer.start({
     approval,
-    executable: piExecutable(),
+    pi,
     stateDirectory: process.env.OX_AGENT_STATE_DIR ?? join(homedir(), ".ox", "agent-serve"),
     port,
     tailnet: publication.kind === "tailscale" ? publication.tailnet : undefined,
@@ -61,6 +66,9 @@ async function serve(args: string[]): Promise<void> {
       return fail(error.message);
     })
     : undefined;
+  if (await server.signedInProviders() === 0) {
+    console.error("pi has no signed-in model provider yet. Run `ox agent login <provider>` on this machine before sending messages from Ox.");
+  }
   const endpoint = published?.endpoint ?? server.url;
   agentLog("serve.published", { endpoint, publication: publication.kind, keepAwake: awake !== undefined });
   console.log(endpoint);
@@ -77,6 +85,23 @@ async function serve(args: string[]): Promise<void> {
   process.once("SIGTERM", () => void shutdown("SIGTERM", 0));
   void published?.exited.then(() => shutdown("tailscale_serve_exited", 1));
   void awake?.exited.then(() => shutdown("keep_awake_exited", 1));
+}
+
+function resolvedPi(): PiCommand {
+  try { return piCommand(); }
+  catch (error) { return fail((error as Error).message); }
+}
+
+async function login(args: string[]): Promise<void> {
+  if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
+    console.log(LOGIN_USAGE);
+    return;
+  }
+  const pi = resolvedPi();
+  const child = Bun.spawn({ cmd: [...pi.argv, "auth", "login", ...args], stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+  const code = await child.exited;
+  agentLog("login.exit", { source: pi.source, code });
+  if (code !== 0) process.exit(code);
 }
 
 async function preparePublication(local: boolean, port: number): Promise<Publication> {

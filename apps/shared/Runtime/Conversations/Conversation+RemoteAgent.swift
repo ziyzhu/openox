@@ -377,7 +377,7 @@ extension Conversation {
         let provider = remoteAgent?.model?.provider ?? String(localized: "its provider")
         Log.session.error("Conversation.remote model failed id=\(id) kind=\(kind.rawValue) status=\(status ?? 0) error=\(LogPrivacy.text(raw, limit: 300))")
         let message = switch kind {
-        case .authentication: String(localized: "\(agent) couldn't sign in to \(provider): \(detail). Log in again on that computer (run pi, then /login), then retry.")
+        case .authentication: String(localized: "\(agent) couldn't sign in to \(provider): \(detail). Log in again on that computer with ox agent login, then retry.")
         case .rateLimited, .network: raw
         case .contextOverflow: String(localized: "This conversation is too long for \(assistant.model) on \(agent): \(detail)")
         case .unsupportedInput, .provider: String(localized: "\(provider) error on \(agent): \(detail)")

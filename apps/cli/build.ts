@@ -9,7 +9,7 @@ const result = await Bun.build({
   outdir: outputDirectory,
   naming: "ox.js",
   target: "bun",
-  external: ["typebox", "typebox/*"],
+  external: ["typebox", "typebox/*", "@earendil-works/pi-coding-agent"],
 });
 
 if (!result.success) {
