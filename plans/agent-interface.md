@@ -118,6 +118,59 @@ Conversation ──► AgentConnection
 - Remote conversations still use the durable DB for metadata, `ox.native.presentation` copies and read state, with no model entries.
 - pi sessions not yet known to the Host show under their agent and become Host conversations when opened.
 
+## Boundaries and roadmap
+
+Client shows, Host decides, Agent executes. Each machine owns what is tied to it; the Profile chooses what to use. Later the Host splits into the Profile (what the user owns) and an Environment (the device it runs on), and "Host" is renamed to Environment.
+
+```diff
+  Role         owns
+  Client       UI state only; talks to the Host
+  Profile      memory, skills, conversations, files, policy, which agents and providers to use
+  Environment  secrets, folder grants, website logins, VM, ingress, push (today: the Host)
+  Agent        the loop and its machine's limits: authorized folders, tools, macOS permissions
+```
+
+Agent machine limits:
+
+```diff
+  folders.json          set by `ox agent serve --directory` and `ox agent folders` on that machine
++ folders.add/remove    accepted over loopback only; Hosts read folders, never change them
++ conversations.new     result + cwd; the Host stores it on RemoteAgentBinding
++ serve --tools         limit of pi tools (read, grep, find, ls, edit, write, bash), reported in agent.describe.tools
++ agentTools            the Host picks a subset per conversation on new/open/setTools → pi --tools
++ Shell access          per-conversation toggle, offered only when serve allows bash; bash prompts answered in the app
+```
+
+The built-in agent gets no shell; it delegates shell work with `ox.conversation.start({ agent })`. A remote machine's folders are not mounted into `ox.fs` for now.
+
+Device-bound values belong to a Profile but stay in device storage, keyed by `profileId`; the Profile folder holds only names and IDs, since it can be synced or exported.
+
+```diff
+  item                    today                                  after
+  secrets, provider keys, Keychain "secret:<k>", "api:<p>",      Keychain "<profileId>/secret:<k>", "<profileId>/api:<p>", ...
+  subscription and          "oauth:mcp:…", app-wide              device-wide accounts (push key, ingress) keep their names
+  MCP tokens
+  website logins          one WKWebsiteDataStore, UUID from      the existing store is kept for the current Profile;
+                          the website-data namespace             other Profiles get UUIDs from namespace + profileId
+  folder grants           device-folder-grants.json + profileId  unchanged
+  mounted repositories    app-level paths                        keyed by profileId
+  policy, services, providers, remote agents  app Configuration/  Profile
+  ingress, push, VM       device                                 device
+```
+
+Migration assigns everything existing to the Profile selected at upgrade. Keychain accounts move with the existing `CredentialMigrator` pattern: write the prefixed account, read it back, then delete the old one. Website data needs no copy: the current Profile keeps the existing store.
+
+Website data moves between Profiles and devices with `WKWebsiteDataStore.fetchData(of:)` and `restoreData(_:)` (iOS 26, macOS 26, within the deployment targets). The blob is opaque and holds session cookies, so it is a secret: it never goes into the Profile folder in plain form, only into an encrypted Profile export. Which data types it carries, and whether a blob restores on another device, must be verified on a device before relying on it; otherwise opening a Profile elsewhere asks to sign in again. Deleting a Profile removes its store with `WKWebsiteDataStore.remove(forIdentifier:)` and its Keychain accounts, after confirmation.
+
+Order:
+
+1. Folders writable only over loopback; `cwd` in `conversations.new`.
+2. Tool limit, `agentTools`, `setTools`, Shell access toggle.
+3. Per-Profile secrets (prefixed Keychain accounts) and website logins (store per Profile), migrated to the Profile selected at upgrade.
+4. Website data export and import with `fetchData`/`restoreData`, after a device check of what restores.
+5. Move policy, services, providers and remote agents into the Profile (storage migration).
+6. Rename Host to Environment in code, protocol and copy (`ox --env`, "Profile on iPhone").
+
 ## Notifications
 
 The Host notifies locally while it runs. `ox agent serve` sends a push when no Host is subscribed to a conversation, because an iPhone Host is suspended while the app is closed.
@@ -266,7 +319,7 @@ Later, if wanted: let the built-in agent use a remote machine's pi providers (fo
 - Remote turns are recorded as `ox.native.turn` entries after each run, because the projection restores turns only from entries that carry model messages.
 - Step 1 (renaming the local agent's actions to pi names) was skipped: both connections already meet at `AgentEvent`, and the rename would only churn the durable bridge.
 - Security: `ox agent serve` binds `127.0.0.1` and publishes `wss://<mac>.ts.net:9878` with a foreground `tailscale serve`; only the Tailscale user who owns the Mac, or local loopback callers without forwarding headers, are admitted. Raw tailnet binding was removed.
-- Folders: `--directory` is repeatable; `agent.describe.folders` feeds a Folder row in the agent sheet, and `conversations.new {cwd}` must stay inside the roots.
+- Folders: the agent keeps authorized folders in `folders.json`, set by `--directory` and changed with `folders.add`/`folders.remove` (`ox agent folders`); a conversation without `cwd` runs in `conversations/<id>/` under the agent's state directory; the agent tells pi its working folder and authorized folders each turn; the agent sheet offers Own folder or an authorized folder.
 - Children: `ox.conversation.start({ agent, folder })` runs a child conversation on a remote agent, so an Ox conversation (or a remote pi) can delegate to pi on another machine.
 - Catch-up: events carry `seq`; when the socket drops mid-run the Host retries for up to 10 minutes and reopens with `since`, replaying missed events. A gap on an idle conversation, or a serve restart, ends the run with a notice.
 - Keep-awake: serve holds `caffeinate -i -w <pid>` on macOS unless `--allow-sleep`.

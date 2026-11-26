@@ -232,11 +232,12 @@ extension Conversation {
         client.markApplied(RemoteAgentSelection(model: binding.model, thinking: binding.thinkingLevel), for: conversationID)
         var next = binding
         next.conversationID = conversationID
+        next.cwd = created["cwd"]?.stringValue
         if next.model == nil, let model = created["model"]?.objectValue, let provider = model["provider"]?.stringValue, let id = model["id"]?.stringValue {
             next.model = AgentModelReference(provider: provider, id: id)
         }
         remoteAgent = next
-        Log.session.info("Conversation.remote created id=\(id) conversation=\(conversationID)")
+        Log.session.info("Conversation.remote created id=\(id) conversation=\(conversationID) cwd=\(next.cwd == nil ? "unknown" : "reported")")
         return (conversationID, 0)
     }
 
@@ -499,7 +500,7 @@ extension Conversation {
                 "name": .string(directory.displayName(for: binding.endpoint)),
                 "address": .string(binding.endpoint.absoluteString),
                 "machine": directory.machine(for: binding.endpoint).map(JSONValue.string) ?? .null,
-                "folder": binding.folder.map(JSONValue.string) ?? .null,
+                "folder": (binding.cwd ?? binding.folder).map(JSONValue.string) ?? .null,
             ]),
             "provider": .object(["id": .string(reference?.provider ?? "agent"), "name": .string(reference?.provider ?? directory.displayName(for: binding.endpoint))]),
             "model": .object(["id": .string(reference?.id ?? "default"), "name": .string(reference.flatMap { directory.modelName($0, endpoint: binding.endpoint) } ?? reference?.id ?? "Agent default")]),

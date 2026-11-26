@@ -85,6 +85,7 @@ const MODELS_CACHE_MS = 60 * 1000;
 const PI_FAILURE = -32000;
 const UNKNOWN_CONVERSATION = -32001;
 const UNKNOWN_PROMPT = -32002;
+const LOCAL_ONLY = -32003;
 
 class Subscribed {
   readonly complete: (reply: (result: unknown) => void) => void;
@@ -131,8 +132,8 @@ export class AgentServer {
     "conversations.compact": (params: { id: string }) => this.command(params.id, "compact"),
     "conversations.rename": (params: { id: string; title: string }) => this.rename(params.id, params.title),
     "folders.list": () => this.listFolders(),
-    "folders.add": (params: { path: string }) => this.addFolder(params.path),
-    "folders.remove": (params: { path: string }) => this.removeFolder(params.path),
+    "folders.add": (params: { path: string }, socket) => this.addFolder(params.path, socket),
+    "folders.remove": (params: { path: string }, socket) => this.removeFolder(params.path, socket),
     "notifications.register": (params: AgentPushRegistration) => this.push.register(params).then(() => ({})),
     "notifications.unregister": (params: { token: string }) => this.push.unregister(params.token).then(() => ({})),
   };
@@ -353,7 +354,7 @@ export class AgentServer {
       const state = await pi.command<PiState>("get_state");
       if (state.sessionId !== id) throw new Error(`pi started conversation ${state.sessionId ?? "unknown"} instead of ${id}`);
       await this.origins.add(id);
-      return { id, model: modelRef(state.model) };
+      return { id, model: modelRef(state.model), cwd };
     } catch (error) {
       if (conversation.process.kind === "live") await conversation.process.pi.shutdown();
       this.conversations.delete(id);
@@ -430,16 +431,24 @@ export class AgentServer {
     return { folders: this.folders.list() };
   }
 
-  private async addFolder(path: string) {
+  private async addFolder(path: string, socket: AgentSocket) {
+    this.requireLocal(socket, "folders.add");
     try { await this.folders.add(path); }
     catch (error) { throw error instanceof FolderAccessError ? new RPCError(-32602, error.message) : error; }
     return this.listFolders();
   }
 
-  private async removeFolder(path: string) {
+  private async removeFolder(path: string, socket: AgentSocket) {
+    this.requireLocal(socket, "folders.remove");
     try { await this.folders.remove(path); }
     catch (error) { throw error instanceof FolderAccessError ? new RPCError(-32602, error.message) : error; }
     return this.listFolders();
+  }
+
+  private requireLocal(socket: AgentSocket, method: string): void {
+    if (socket.data.via === "loopback") return;
+    agentLog("folders.refused", { connection: socket.data.id, method, via: socket.data.via });
+    throw new RPCError(LOCAL_ONLY, `Folders can only be changed on ${hostname()}: run ox agent folders there`);
   }
 
   private async close(id: string, socket: AgentSocket) {

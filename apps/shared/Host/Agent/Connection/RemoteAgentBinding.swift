@@ -11,5 +11,6 @@ nonisolated struct RemoteAgentBinding: Codable, Equatable, Sendable {
     var model: AgentModelReference?
     var thinkingLevel: String?
     var folder: String?
+    var cwd: String?
     var lastSeq: Int?
 }

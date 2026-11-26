@@ -69,6 +69,7 @@ test.skipIf(!executable)("serves pi conversations over JSON-RPC", async () => {
   const listed = await client.request<{ conversations: { id: string; origin: string; cwd: string }[] }>("conversations.list");
   expect(valid("AgentConversationsResult", listed)).toBe(true);
   expect(listed.conversations.find((row) => row.id === created.id)).toMatchObject({ origin: "ox", cwd: join(root, "state", "conversations", created.id) });
+  expect(created).toMatchObject({ cwd: join(root, "state", "conversations", created.id) });
 
   const opened = await client.request("conversations.open", { id: created.id, context, tools }, timeout);
   expect(valid("AgentOpenResult", opened)).toBe(true);

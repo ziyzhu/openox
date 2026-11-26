@@ -47,7 +47,9 @@ export const AgentSchemas = {
   AgentNewRequest: object("AgentNewRequest", {
     cwd: nullable(S({ minLength: 1, maxLength: 4096, description: "An authorized folder or a descendant; omitted, the conversation gets its own working folder." })), model: nullable(R("AgentModelRef")), thinkingLevel: nullable(S()), context: R("AgentContext"), tools: A(R("AgentTool")),
   }),
-  AgentNewResult: object("AgentNewResult", { id: conversationId(), model: nullable(R("AgentModelRef")) }),
+  AgentNewResult: object("AgentNewResult", {
+    id: conversationId(), model: nullable(R("AgentModelRef")), cwd: optional(S({ description: "The conversation's working folder on the agent's machine." })),
+  }),
   AgentOpenRequest: object("AgentOpenRequest", {
     id: conversationId(), context: R("AgentContext"), tools: A(R("AgentTool")),
     since: optional(I({ minimum: 0, description: "Replay buffered conversations.event notifications with seq greater than this before live events." })),
@@ -58,7 +60,7 @@ export const AgentSchemas = {
     thinkingLevel: nullable(S()), title: nullable(S()), seq: I({ minimum: 0, description: "Latest event seq for this conversation." }),
     replay: optional(Type.Union([Type.Literal("complete"), Type.Literal("gap")], { description: "Whether every event after since was still buffered." })),
   }),
-  AgentFolderRequest: object("AgentFolderRequest", { path: S({ minLength: 1, maxLength: 4096 }) }),
+  AgentFolderRequest: object("AgentFolderRequest", { path: S({ minLength: 1, maxLength: 4096 }) }, { description: "Accepted only from the agent's own machine (loopback); Hosts can read folders but not change them." }),
   AgentFoldersResult: object("AgentFoldersResult", { folders: A(S()) }),
   AgentConversationRequest: object("AgentConversationRequest", { id: conversationId() }),
   AgentSendRequest: object("AgentSendRequest", {
