@@ -57,10 +57,6 @@ nonisolated enum A11yID {
         static let search = "files.search"
         static let filterAndSort = "files.filterAndSort"
         static let add = "files.add"
-        static let addFiles = "files.add.files"
-        static let addPhotos = "files.add.photos"
-        static let addCamera = "files.add.camera"
-        static let previewDismiss = "files.preview.dismiss"
         static let renameName = "files.rename.name"
         static let renameCancel = "files.rename.cancel"
         static let renameSubmit = "files.rename.submit"
@@ -129,9 +125,6 @@ nonisolated enum A11yID {
         static let profileCreate = "settings.profileCreate"
         static let profileOpen = "settings.profileOpen"
         static let profileImport = "settings.profileImport"
-        static let profileImportName = "settings.profileImport.name"
-        static let profileImportConfirm = "settings.profileImport.confirm"
-        static let profileImportCancel = "settings.profileImport.cancel"
         static func profileExport(_ id: String) -> String { "settings.profileExport.\(id)" }
         static func profileRow(_ id: String) -> String { "settings.profile.\(id)" }
         static func profileRename(_ id: String) -> String { "settings.profileRename.\(id)" }
@@ -217,10 +210,6 @@ nonisolated enum A11yID {
         static let modelKeyRemove = "conversation.modelKeyRemove"
         static let modelKeyWebsite = "conversation.modelKeyWebsite"
         static let mentionLoading = "conversation.mention.loading"
-
-        enum HTMLFile {
-            static let dismiss = "conversation.htmlFile.dismiss"
-        }
 
         enum MarkdownFile {
             static let dismiss = "conversation.markdownFile.dismiss"
@@ -309,8 +298,6 @@ nonisolated enum A11yID {
             static func remove(_ domain: String) -> String { "conversation.attach.remove.\(domain)" }
             static func action(_ id: String) -> String { "conversation.attach.action.\(id)" }
             static func actionApproval(_ id: String) -> String { "conversation.attach.actionApproval.\(id)" }
-            static let deviceFilesAdd = "conversation.attach.deviceFiles.add"
-            static func deviceFilesRemove(_ id: String) -> String { "conversation.attach.deviceFiles.remove.\(id)" }
             static func devicePermission(_ id: String) -> String { "conversation.attach.devicePermission.\(id)" }
         }
 
@@ -386,10 +373,6 @@ enum A11yLabel {
     static var copyCode: String { L10n.string("Copy code", comment: "") }
     static var branchMessage: String { L10n.string("Branch from this reply", comment: "") }
     static var retryMessage: String { L10n.string("Regenerate reply", comment: "") }
-    static var reloadLogs: String { L10n.string("Reload logs", comment: "") }
-    static var copyLogs: String { L10n.string("Copy logs", comment: "") }
-    static var clearLogs: String { L10n.string("Clear logs", comment: "") }
-    static var editKey: String { L10n.string("Edit API key", comment: "") }
 
     static func remove(_ name: String) -> String { String(format: L10n.string("Remove %@", comment: ""), name) }
 }

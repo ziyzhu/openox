@@ -22,8 +22,6 @@ type Snapshot = {
   dispose: () => Promise<void>;
 };
 
-const SERVICE_ID = /^(?:web|api|ios|mcp):[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/;
-const CONTENT_HASH = /^[a-f0-9]{64}$/;
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 export const REPOSITORY_COMMANDS: Record<string, SubCommand> = {

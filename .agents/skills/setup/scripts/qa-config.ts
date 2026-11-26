@@ -1,7 +1,5 @@
 import { parseArgs, type ParseArgsOptionsConfig } from "node:util";
 
-export const targetedQaDevice = "ox-1";
-
 export function qaConfig(device: string) {
   const index = Number(/^ox-([1-5])$/.exec(device)?.[1]);
   if (!index) throw new Error(`QA device must be ox-N for N from 1 to 5, got ${device}`);

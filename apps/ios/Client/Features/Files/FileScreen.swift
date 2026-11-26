@@ -146,11 +146,6 @@ struct FileNavigationPage: View {
 }
 
 struct FileZoomPreviewScreen: View {
-    enum Chrome {
-        case immersive(onDismiss: () -> Void)
-        case navigation
-    }
-
     private enum LoadState: Equatable {
         case loading
         case ready
@@ -158,7 +153,6 @@ struct FileZoomPreviewScreen: View {
     }
 
     let file: FileItem
-    let chrome: Chrome
     private let scope: ProfileScope?
     private let source: FilePreviewSource
     @State private var image: UIImage?
@@ -169,37 +163,25 @@ struct FileZoomPreviewScreen: View {
     @State private var closesWithQuickLook = false
     @Environment(\.dismiss) private var dismiss
 
-    init(file: FileItem, chrome: Chrome, scope: ProfileScope? = StorageRoot.currentScope) {
+    init(file: FileItem, scope: ProfileScope? = StorageRoot.currentScope) {
         self.file = file
-        self.chrome = chrome
         self.scope = scope
         source = FilePreviewSource(file: file, scope: scope)
     }
 
     @ViewBuilder
     var body: some View {
-        Group {
-            switch chrome {
-            case .immersive(let onDismiss):
-                FileScreen(onDismiss: onDismiss, dismissIdentifier: A11yID.Files.previewDismiss) { _ in
-                    preview
-                } actions: {
-                    FileShareGlassButton(file: file, scope: scope)
+        preview
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Theme.Colors.conversationSurface)
+            .navigationTitle(file.userFacingName)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    FileShareToolbarButton(file: file, scope: scope)
                 }
-            case .navigation:
-                preview
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Theme.Colors.conversationSurface)
-                    .navigationTitle(file.userFacingName)
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar(.visible, for: .navigationBar)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            FileShareToolbarButton(file: file, scope: scope)
-                        }
-                    }
             }
-        }
         .onAppear {
             Log.ui.info("FileZoomPreviewScreen.load filename=\(file.fileName) kind=\(file.kind.rawValue)")
         }
@@ -209,10 +191,7 @@ struct FileZoomPreviewScreen: View {
         .quickLookPreview($previewURL)
         .onChange(of: previewURL) { previous, current in
             guard previous != nil, current == nil, closesWithQuickLook else { return }
-            switch chrome {
-            case .immersive(let onDismiss): onDismiss()
-            case .navigation: dismiss()
-            }
+            dismiss()
         }
     }
 

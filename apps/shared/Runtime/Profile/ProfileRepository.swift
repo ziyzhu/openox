@@ -26,15 +26,7 @@ actor ProfileRepository {
         let destination = base.appendingPathComponent(Self.cleanName(name))
         guard destination != profile.url else { return nil }
         guard !FileManager.default.fileExists(atPath: destination.path) else { throw ProfileError.nameExists(name) }
-        try await DurableProfileStore.shared.close(in: ProfileScope(profileID: profile.id, root: profile.url, location: profile.location))
-        let scope = ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
-        LogFile.shared.suspend(in: scope)
-        do {
-            try FileManager.default.moveItem(at: profile.url, to: destination)
-        } catch {
-            if StorageRoot.currentScope?.profileID == profile.id { LogFile.shared.activate(in: scope) }
-            throw error
-        }
+        try await relocate(profile, to: destination)
         var renamed = profile; renamed.name = destination.lastPathComponent; renamed.url = destination
         return renamed
     }
@@ -43,8 +35,14 @@ actor ProfileRepository {
         guard location == .local else { throw RuntimeError.bridge("Export/import a closed Profile snapshot instead of synchronizing a live database") }
         let destination = base.appendingPathComponent(profile.name)
         guard !FileManager.default.fileExists(atPath: destination.path) else { throw ProfileError.nameExists(profile.name) }
-        try await DurableProfileStore.shared.close(in: ProfileScope(profileID: profile.id, root: profile.url, location: profile.location))
+        try await relocate(profile, to: destination)
+        var moved = profile; moved.url = destination; moved.location = location
+        return moved
+    }
+
+    private func relocate(_ profile: Profile, to destination: URL) async throws {
         let scope = ProfileScope(profileID: profile.id, root: profile.url, location: profile.location)
+        try await DurableProfileStore.shared.close(in: scope)
         LogFile.shared.suspend(in: scope)
         do {
             try FileManager.default.moveItem(at: profile.url, to: destination)
@@ -52,8 +50,6 @@ actor ProfileRepository {
             if StorageRoot.currentScope?.profileID == profile.id { LogFile.shared.activate(in: scope) }
             throw error
         }
-        var moved = profile; moved.url = destination; moved.location = location
-        return moved
     }
 
     func deleteProfile(_ profile: Profile) async throws {
@@ -70,13 +66,6 @@ actor ProfileRepository {
         if FileManager.default.fileExists(atPath: predecessor.path) { try FileManager.default.removeItem(at: predecessor) }
         deleted = deleted.filter { $0.key.profileID != profile.id }
     }
-
-    func artifactsDirectory(in scope: ProfileScope) throws -> URL {
-        try requireProfile(in: scope)
-        return scope.root.appendingPathComponent("artifacts")
-    }
-
-    func skillsDirectory(in scope: ProfileScope) throws -> URL { try requireProfile(in: scope); return scope.root.appendingPathComponent("skills", isDirectory: true) }
 
     func file(named name: String, in scope: ProfileScope) throws -> URL {
         try requireProfile(in: scope)

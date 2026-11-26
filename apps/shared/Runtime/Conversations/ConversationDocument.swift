@@ -195,15 +195,6 @@ nonisolated struct ConversationDocument: Sendable {
         return turn.generations.last?.at ?? turn.at
     }
 
-    var tailTextLength: Int {
-        guard case let .agentContent(items) = projection.last?.kind else { return 0 }
-        return items.reduce(0) { sum, item in
-            if case let .text(text) = item { return sum + text.count }
-            return sum
-        }
-    }
-
-    func toWire() -> [Message] { ConversationProjection.wire(turns) }
     func blocksWithTurn() -> [(Block, Int)] {
         let turnsByID = Dictionary(uniqueKeysWithValues: turns.enumerated().map { ($0.element.id, $0.offset) })
         return projection.compactMap { block in

@@ -81,19 +81,8 @@ nonisolated enum Credentials {
     }
 
     static func accounts(prefix: String) throws -> [String] {
-        let request: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecMatchLimit as String: kSecMatchLimitAll,
-            kSecReturnAttributes as String: true,
-        ]
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(request as CFDictionary, &result)
-        if status == errSecItemNotFound { return [] }
-        guard status == errSecSuccess else { throw keychainError(status) }
-        guard let items = result as? [[String: Any]] else { throw RuntimeError.bridge("Keychain account list is corrupt") }
         let scope = scopePrefix()
-        return items.compactMap { $0[kSecAttrAccount as String] as? String }.compactMap { account in
+        return try allAccounts().compactMap { account in
             switch scope {
             case let scope?: account.hasPrefix(scope) ? String(account.dropFirst(scope.count)) : nil
             case nil: profileID(of: account) == nil ? account : nil

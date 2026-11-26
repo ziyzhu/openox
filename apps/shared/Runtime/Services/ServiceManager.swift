@@ -726,36 +726,8 @@ final class ServiceManager {
         return kind
     }
 
-    func listServiceSource(kind: ServicesMount.Kind, domain: String, path: [String]) async throws -> [Repository.Entry] {
-        try await repository.listSource(kind: kind.repositoryKind, id: domain, path: path)
-    }
-
-    func serviceSourceIsDirectory(kind: ServicesMount.Kind, domain: String, path: [String]) async throws -> Bool {
-        try await repository.sourceIsDirectory(kind: kind.repositoryKind, id: domain, path: path)
-    }
-
     func compareServiceSources(_ service: String) async throws -> JSONValue {
         try await repository.compareSources(service: service)
-    }
-
-    func readServiceSource(kind: ServicesMount.Kind, domain: String, path: [String]) async throws -> Data {
-        try await repository.readSource(kind: kind.repositoryKind, id: domain, path: path)
-    }
-
-    func writeServiceSource(kind: ServicesMount.Kind, domain: String, path: [String], data: Data) async throws {
-        try await repository.writeLocalSource(kind: kind.repositoryKind, id: domain, path: path, data: data)
-    }
-
-    func updateServiceManifest(kind: ServicesMount.Kind, domain: String, fields: [String: JSONValue]) async throws {
-        try await repository.updateLocalManifest(kind: kind.repositoryKind, id: domain, fields: fields)
-    }
-
-    func deleteServiceSource(kind: ServicesMount.Kind, domain: String, path: [String], recursive: Bool) async throws {
-        try await repository.deleteLocalSource(kind: kind.repositoryKind, id: domain, path: path, recursive: recursive)
-    }
-
-    func serviceSourcePaths(kind: ServicesMount.Kind, domain: String) async throws -> [String] {
-        try await repository.sourcePaths(kind: kind.repositoryKind, id: domain)
     }
 
     private func localScriptKind(_ domain: String) async throws -> ServicesMount.Kind {

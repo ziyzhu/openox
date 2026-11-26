@@ -48,22 +48,11 @@ final class Conversation: Identifiable {
     let skillSession = SkillSession()
     let serviceManager: ServiceManager
     let fileMutationCoordinator = FileMutationCoordinator.shared
-    private(set) var retention: ConversationRetention
+    let retention: ConversationRetention
     var remoteAgent: RemoteAgentBinding? { didSet { if remoteAgent != oldValue { onPersistableChange?() } } }
 
     var isTemporary: Bool { retention == .temporary }
     var canChangeRetention: Bool { transcript.isEmpty && queuedMessages.isEmpty && !isBusy }
-
-    func toggleRetention() -> Bool {
-        guard canChangeRetention else {
-            Log.session.info("Conversation.retention ignored id=\(id) reason=started")
-            return false
-        }
-        retention = isTemporary ? .persisted : .temporary
-        remoteAgent = isTemporary ? nil : RemoteAgentDirectory.shared.defaultBinding
-        Log.session.info("Conversation.retention changed id=\(id) retention=\(String(describing: retention))")
-        return true
-    }
 
     func switchModel(to client: any ProviderClient, model: ProviderModel, selection: ModelSelection) {
         cancelModelSelectionChange()
@@ -365,18 +354,6 @@ final class Conversation: Identifiable {
         }
     }
 
-    var hasLiveTrace: Bool {
-        guard isBusy else { return false }
-        if case let .thinking(trace) = transcript.last?.kind, trace.completedAt == nil { return true }
-        return false
-    }
-
-    var hasThinkingTail: Bool {
-        guard isBusy else { return false }
-        if case .thinking = transcript.last?.kind { return true }
-        return false
-    }
-
     var thinkingActivity: ThinkingActivity? {
         guard activity.isThinking,
               document.hasOpenAgentTurn,
@@ -639,12 +616,6 @@ final class Conversation: Identifiable {
         )
     }
 
-    func resolvePendingPrompt(_ request: ConversationPendingPrompt, answer: String) {
-        guard case .prompt(let prompt) = interaction,
-              prompt.id == request.id,
-              prompt.presentation == request.presentation else { return }
-        resolvePrompt(blockId: request.id, answer: answer)
-    }
     private(set) var lastActivityAt: Date?
 
     @ObservationIgnored weak var conversationManager: ConversationManager?

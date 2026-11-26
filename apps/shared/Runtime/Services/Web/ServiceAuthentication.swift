@@ -46,10 +46,6 @@ extension Service {
         }
     }
 
-    var accessActionLabel: String {
-        auth == .authorizationRequired ? "Set Up" : "Manage"
-    }
-
     func awaitAuthenticationAvailability(name: String) async throws {
         guard auth.isLoggingIn else { return }
         let id = UUID()

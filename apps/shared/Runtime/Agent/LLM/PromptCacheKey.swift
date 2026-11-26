@@ -1,13 +1,6 @@
 import CryptoKit
 import Foundation
 
-nonisolated func systemPromptFingerprint(_ systemPrompt: String?) -> String {
-    SHA256.hash(data: Data((systemPrompt ?? "").utf8))
-        .prefix(6)
-        .map { String(format: "%02x", $0) }
-        .joined()
-}
-
 // Cache backends route requests by a caller-supplied affinity key (OpenAI's
 // prompt_cache_key / session-id, OpenRouter's x-session-id); the key must be
 // identical across requests sharing a prompt prefix or every request lands on

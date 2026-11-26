@@ -18,7 +18,6 @@ struct SkillsMount {
         }
         var directoryPath: String { "skills/\(name)" }
         var filePath: String { "\(directoryPath)/SKILL.md" }
-        func resourcePath(_ resource: Resource) -> String { "\(directoryPath)/\(resource.name)" }
     }
 
     let repository: ProfileRepository

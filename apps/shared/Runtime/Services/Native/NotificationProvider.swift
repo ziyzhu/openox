@@ -54,9 +54,7 @@ final class NotificationProvider {
     func deliverIfAuthorized(identifier: String, title: String, body: String, isCurrent: () -> Bool = { true }) async throws -> Bool {
         let status = await center.notificationSettings().authorizationStatus
         guard isCurrent() else { return false }
-        guard status == .authorized || status == .provisional || status == .ephemeral else {
-            return false
-        }
+        guard status.allowsDelivery else { return false }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
@@ -81,11 +79,8 @@ final class NotificationProvider {
 
     private func ensureAuthorized() async throws {
         let status = await center.notificationSettings().authorizationStatus
+        guard !status.allowsDelivery else { return }
         switch status {
-        case .authorized, .provisional:
-            return
-        case .ephemeral:
-            return
         case .denied:
             Log.agent.info("notify.auth denied")
             throw NotifyError.denied
@@ -93,7 +88,7 @@ final class NotificationProvider {
             Log.agent.info("notify.auth requesting")
             let granted = (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
             if !granted { throw NotifyError.denied }
-        @unknown default:
+        default:
             throw NotifyError.denied
         }
     }

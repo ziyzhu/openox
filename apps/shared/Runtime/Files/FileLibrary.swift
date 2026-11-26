@@ -121,11 +121,6 @@ nonisolated enum FileLibrary {
         }
     }
 
-    static func listOptions(from value: JSONValue?) -> ListOptions {
-        let values = value?.objectValue ?? [:]
-        return ListOptions(query: values["query"]?.stringValue ?? "", limit: int(values["limit"], default: 50))
-    }
-
     static func readOptions(from value: JSONValue?) -> ReadOptions {
         let values = value?.objectValue ?? [:]
         return ReadOptions(

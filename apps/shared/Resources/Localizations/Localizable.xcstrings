@@ -3351,17 +3351,6 @@
         }
       }
     },
-    "Clear logs" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "清除日志"
-          }
-        }
-      }
-    },
     "Clear Website Data" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3819,17 +3808,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "复制对话"
-          }
-        }
-      }
-    },
-    "Copy logs" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "复制日志"
           }
         }
       }
@@ -5410,17 +5388,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "编辑文件"
-          }
-        }
-      }
-    },
-    "Edit API key" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "编辑 API 密钥"
           }
         }
       }
@@ -10898,17 +10865,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新加载"
-          }
-        }
-      }
-    },
-    "Reload logs" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重新加载日志"
           }
         }
       }

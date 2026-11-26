@@ -13,12 +13,6 @@ nonisolated struct Skill: Codable, Identifiable, Equatable, Sendable {
     var displayName: String { name }
 }
 
-nonisolated struct SkillPatch: Sendable {
-    var description: String?
-    var instructions: String?
-    var services: [String]?
-}
-
 nonisolated enum SkillError: LocalizedError, Sendable {
     case invalidPackage
     case conflict(String)
@@ -28,8 +22,6 @@ nonisolated enum SkillError: LocalizedError, Sendable {
     case exists(String)
     case emptyDescription
     case emptyInstructions
-    case findMissing(String)
-    case findAmbiguous(String, matches: Int)
 
     var errorDescription: String? {
         switch self {
@@ -41,8 +33,6 @@ nonisolated enum SkillError: LocalizedError, Sendable {
         case .exists(let name): "A skill named /\(name) already exists."
         case .emptyDescription: "Skill description cannot be empty."
         case .emptyInstructions: "Skill instructions cannot be empty."
-        case .findMissing(let name): "The requested text was not found in /\(name)."
-        case .findAmbiguous(let name, let matches): "The requested text matched \(matches) locations in /\(name); make it more specific."
         }
     }
 }
@@ -239,50 +229,6 @@ extension ProfileRepository {
             description: description,
             instructions: instructions,
             services: services,
-            in: scope
-        )
-    }
-
-    func updateSkill(named name: String, patch: SkillPatch, in scope: ProfileScope) async throws -> Skill {
-        let current = try await skill(named: name, in: scope)
-        return try await saveSkill(
-            name: current.name,
-            description: patch.description ?? current.description,
-            instructions: patch.instructions ?? current.instructions,
-            services: patch.services ?? current.services,
-            replacing: current.name,
-            in: scope
-        )
-    }
-
-    func replaceSkillText(named name: String, oldText: String, newText: String, in scope: ProfileScope) async throws -> Skill {
-        let current = try await skill(named: name, in: scope)
-        let instructions: String
-        if oldText.isEmpty {
-            instructions = current.instructions.isEmpty ? newText : current.instructions + "\n" + newText
-        } else {
-            let matches = ExactTextReplacement.count(oldText, in: current.instructions)
-            guard matches > 0 else { throw SkillError.findMissing(current.name) }
-            guard matches == 1 else { throw SkillError.findAmbiguous(current.name, matches: matches) }
-            instructions = ExactTextReplacement.replace(oldText, with: newText, in: current.instructions)
-        }
-        return try await updateSkill(
-            named: current.name,
-            patch: SkillPatch(instructions: instructions),
-            in: scope
-        )
-    }
-
-    func renameSkill(named name: String, to newName: String, in scope: ProfileScope) async throws -> Skill {
-        let current = try await skill(named: name, in: scope)
-        let destination = try canonicalSkillName(newName)
-        guard destination != current.name else { return current }
-        return try await saveSkill(
-            name: destination,
-            description: current.description,
-            instructions: current.instructions,
-            services: current.services,
-            replacing: current.name,
             in: scope
         )
     }

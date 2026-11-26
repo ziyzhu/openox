@@ -48,17 +48,3 @@ nonisolated public struct OpenAIAPIKeyAuth: OpenAITransportAuth {
         return OpenAIEndpoint(url: baseURL.appendingPathComponent(path), headers: headers)
     }
 }
-
-nonisolated public struct OpenAIOptionalAPIKeyAuth: OpenAITransportAuth {
-    let clientID: String
-    let baseURL: URL
-
-    public var canRefresh: Bool { false }
-    public func resolve(forceRefresh: Bool) async throws -> OpenAIEndpoint {
-        var headers: [String: String] = [:]
-        if let key = Credentials.key(for: clientID) {
-            headers["Authorization"] = "Bearer \(key)"
-        }
-        return OpenAIEndpoint(url: baseURL.appendingPathComponent("chat/completions"), headers: headers)
-    }
-}

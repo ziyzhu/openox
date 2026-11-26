@@ -48,19 +48,9 @@ struct ConversationBlock: Identifiable, Equatable {
         return skill
     }
 
-    var isResponseFooter: Bool {
-        if case .responseFooter = kind { return true }
-        return false
-    }
-
     var isThinking: Bool {
         if case .thinking = kind { return true }
         return false
-    }
-
-    var isPendingThinking: Bool {
-        guard case .thinking(let trace) = kind else { return false }
-        return trace.isEmpty && trace.completedAt == nil
     }
 
     var isActiveInteraction: Bool {

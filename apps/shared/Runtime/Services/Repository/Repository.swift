@@ -50,13 +50,6 @@ actor Repository {
             case remote
             case mounted
 
-            var exposesFullSource: Bool {
-                switch self {
-                case .bundled, .local, .mounted: true
-                case .development, .remote: false
-                }
-            }
-
             var selectionPriority: Int {
                 switch self {
                 case .bundled: 0

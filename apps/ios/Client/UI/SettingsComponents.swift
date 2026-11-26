@@ -130,27 +130,6 @@ struct SettingsDisclosureRow: View {
     }
 }
 
-struct SettingsValueRow: View {
-    let value: Text
-    var indicator = "chevron.right"
-
-    var body: some View {
-        HStack(spacing: Theme.Spacing.xs) {
-            value
-                .font(Theme.Fonts.bodyMd)
-                .foregroundStyle(Theme.Colors.onSurface)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .truncationMode(.middle)
-            Spacer(minLength: 0)
-            Image(systemName: indicator)
-                .font(Theme.Icons.xs)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-        }
-        .contentShape(Rectangle())
-    }
-}
-
 struct SettingsActionButtonLabel<Content: View>: View {
     @ViewBuilder let content: () -> Content
 

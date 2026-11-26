@@ -198,7 +198,6 @@ final class ProviderRegistry {
     }
 
     var newSessionClient: any ProviderClient { client(for: sessionModel) }
-    var defaultClientModel: ProviderModel { model(for: sessionModel, client: newSessionClient) }
 
     func definition(id: String) throws -> ProviderDefinition {
         guard let definition = definitions.first(where: { $0.id == id }) else { throw RuntimeError.bridge("Provider not found: \(id)") }
@@ -406,8 +405,6 @@ final class ProviderRegistry {
                                      models: definition.models.map { CustomLLMModel(id: $0.id, displayName: $0.name, maxTokens: $0.outputTokens ?? 4_096, maxContext: $0.contextTokens ?? 32_768) })
         }
     }
-    var customProviderLoading: Set<UUID> { [] }
-    var customProviderErrors: [UUID: String] { [:] }
     func isCustomProviderPending(clientID: String) -> Bool { false }
 
     func upsert(_ provider: CustomLLMProvider) {

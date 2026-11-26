@@ -150,11 +150,6 @@ final class RemoteMCPService {
         )
     }
 
-    var authorizationTitle: String? {
-        guard requiresAuthorization else { return nil }
-        return RemoteMCPOAuth.hasCredential(endpoint: endpoint) ? "Reauthorize" : "Authorize"
-    }
-
     func authorize() async throws -> RemoteMCPDescriptor {
         guard let descriptor else {
             return try await resolve(allowsAuthorization: true)

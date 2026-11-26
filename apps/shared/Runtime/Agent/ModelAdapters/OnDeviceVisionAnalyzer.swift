@@ -31,13 +31,6 @@ nonisolated struct OnDeviceVisionAnalysis: Sendable {
             }),
         ])
     }
-
-    func promptText(filename: String, mimeType: String) -> String? {
-        let value = json(filename: filename, mimeType: mimeType).toAny()
-        guard let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
-              let json = String(data: data, encoding: .utf8) else { return nil }
-        return "<image-analysis provenance=\"apple-vision\">\n\(json)\n</image-analysis>"
-    }
 }
 
 actor OnDeviceVisionAnalyzer {

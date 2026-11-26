@@ -1,5 +1,4 @@
 import { closeSync, mkdirSync, openSync, readFileSync, statSync, unlinkSync, writeSync } from "node:fs";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { run } from "../../../lib.ts";
@@ -53,12 +52,4 @@ export async function requireSimulator(device: string): Promise<boolean> {
   if (!target.runtime.includes(`.iOS-${version}-`)) throw new Error(`${device} must run iOS ${version}`);
   if (target.state !== "Booted" && target.state !== "Shutdown") throw new Error(`${device} is ${target.state}; wait before running QA`);
   return target.state === "Booted";
-}
-
-export async function requireFreePort(port: number): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const server = createServer();
-    server.once("error", () => reject(new Error(`Port ${port} is already in use`)));
-    server.listen(port, "127.0.0.1", () => server.close(error => error ? reject(error) : resolve()));
-  });
 }

@@ -51,7 +51,6 @@ final class Service: NSObject, Identifiable {
         case .mcp(let service): service.detailCapabilities
         }
     }
-    var accessAuthorizationTitle: String? { remoteMCPService?.authorizationTitle }
 
     // MARK: - State
 
@@ -108,10 +107,7 @@ final class Service: NSObject, Identifiable {
         }
 
         var isSignedIn: Bool { observation?.value == .signedIn }
-        var isSignedOut: Bool { observation?.value == .signedOut }
-        var isChecking: Bool { if case .checking = self { true } else { false } }
         var isLoggingIn: Bool { if case .loggingIn = self { true } else { false } }
-        var isUnavailable: Bool { if case .unavailable = self { true } else { false } }
 
         var logLabel: String {
             switch self {
@@ -132,7 +128,6 @@ final class Service: NSObject, Identifiable {
         case notRequired, signedIn, signedOut, authorized, notAuthorized, unknown
 
         var isAuthenticated: Bool { self == .signedIn || self == .authorized }
-        var requiresAuthentication: Bool { self == .signedOut || self == .notAuthorized }
     }
 
     enum AccessPolicy: String {
@@ -142,7 +137,6 @@ final class Service: NSObject, Identifiable {
 
     enum LoginProbeReason: String {
         case attach
-        case conversationOpen
         case modelLogin
         case pendingLogin
         case serviceDetail
@@ -239,7 +233,6 @@ final class Service: NSObject, Identifiable {
     enum AuthLoginSource: String {
         case conversationCard
         case canvas
-        case conversationChip
         case serviceDetail
     }
 

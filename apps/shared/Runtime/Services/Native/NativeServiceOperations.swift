@@ -41,11 +41,6 @@ final class NativeServiceOperations {
         self.authorizeBrowserSite = authorizeBrowserSite
     }
 
-    func presentServicePage(_ service: Service, page: BrowserSession) throws {
-        if let presenter = presentations.browser { presenter(service, page) }
-        else { try showServicePage(service, page) }
-    }
-
     func invoke(service: Service, actionID: String, args: JSONValue, purpose: String?) async throws -> JSONValue? {
         if service.domain == BrowserFunctionCatalog.internalDomain {
             return try await invokeBrowserOperation(actionID: actionID, args: args, purpose: purpose)

@@ -301,17 +301,6 @@ nonisolated enum Secret {
         }
     }
 
-    static func recordAccountIdentity(key: String, identity: String) throws {
-        try lock.withLock { _ in
-            var current = try index()
-            guard let position = current.entries.firstIndex(where: { $0.key == key }),
-                  current.entries[position].accountIdentity != identity else { return }
-            current.entries[position].accountIdentity = identity
-            try save(current)
-            Log.app.info("Secret.accountIdentity key=\(key) recorded=true")
-        }
-    }
-
     static func isNeverRemembered(_ serviceID: String) -> Bool {
         ((try? index())?.neverRemember ?? []).contains(serviceID)
     }
@@ -501,10 +490,6 @@ nonisolated enum Secret {
         try bind(SecretBinding(consumerKind: .repositoryPublication, consumerID: publicationID,
                               secretKey: publicationKey, destination: publicationDestination,
                               configurationFingerprint: publicationID, requiredFields: ["token"]))
-    }
-
-    static func clearPublicationToken() throws {
-        try unbind(.repositoryPublication, id: publicationID)
     }
 
     static func validateKey(_ key: String) throws {

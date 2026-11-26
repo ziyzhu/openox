@@ -108,47 +108,7 @@ struct FilePreviewPresentation: View {
     var scope: ProfileScope? = StorageRoot.currentScope
 
     var body: some View {
-        FileZoomPreviewScreen(
-            file: file,
-            chrome: .navigation,
-            scope: scope
-        )
-    }
-}
-
-struct FileZoomPreviewPresentation: View {
-    let preview: FileZoomPreview
-    let namespace: Namespace.ID
-    let onDismiss: () -> Void
-
-    var body: some View {
-        FileZoomPreviewScreen(
-            file: preview.file,
-            chrome: .immersive(onDismiss: onDismiss),
-            scope: preview.scope
-        )
-            .navigationTransition(.zoom(sourceID: preview.sourceID, in: namespace))
-    }
-}
-
-private struct FileZoomPreviewCover: ViewModifier {
-    let presentation: ZoomPresentation<FileZoomPreview>
-    let namespace: Namespace.ID
-    let onDismiss: (FileItem) -> Void
-
-    func body(content: Content) -> some View {
-        content
-            .scrollDisabled(presentation.isDismissing)
-            .environment(\.filePreviewNamespace, namespace)
-            .fullScreenCover(item: presentation.binding, onDismiss: finishDismissal) { presented in
-                FileZoomPreviewPresentation(preview: presented, namespace: namespace) {
-                    presentation.dismiss()
-                }
-            }
-    }
-
-    private func finishDismissal() {
-        presentation.finishDismissal { onDismiss($0.file) }
+        FileZoomPreviewScreen(file: file, scope: scope)
     }
 }
 
@@ -243,18 +203,6 @@ private struct FileMutationAlerts: ViewModifier {
 }
 
 extension View {
-    func fileZoomPreviewCover(
-        presentation: ZoomPresentation<FileZoomPreview>,
-        namespace: Namespace.ID,
-        onDismiss: @escaping (FileItem) -> Void
-    ) -> some View {
-        modifier(FileZoomPreviewCover(
-            presentation: presentation,
-            namespace: namespace,
-            onDismiss: onDismiss
-        ))
-    }
-
     func fileMutationAlerts(
         _ mutation: Binding<FileMutation?>,
         onRename: @escaping (FileItem, String) -> Void,
