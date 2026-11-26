@@ -5,7 +5,7 @@ import type { AgentPushRegistration } from "@openox/protocol/agent";
 import { PUSH_BODY_LIMIT, PUSH_TITLE_LIMIT, type PushMessage, type PushRelayRequest } from "@openox/protocol/push";
 import { agentLog } from "./agent-log.ts";
 
-const RELAY_URL = process.env.OX_PUSH_RELAY ?? "https://push-relay.invalid/";
+const RELAY_URL = process.env.OX_PUSH_RELAY ?? "https://kuusxbnpmlw6o3qitxxprsfzpq0ennlt.lambda-url.us-west-2.on.aws/";
 const MAX_DEVICES = 20;
 
 export class PushRegistry {
