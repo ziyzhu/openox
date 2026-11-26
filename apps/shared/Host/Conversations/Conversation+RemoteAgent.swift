@@ -79,15 +79,16 @@ extension Conversation {
 
     func submitRemote(_ input: ConversationInput, configuration: AgentConfiguration, binding: RemoteAgentBinding) async throws -> ConversationRunResult {
         let client = RemoteAgentDirectory.shared.client(for: binding.endpoint)
+        await recordRemoteTurns(.request)
         let result: ConversationRunResult
         do {
             try Task.checkCancellation()
             let context = try await remoteContext(configuration: configuration, turnState: input.turnState)
-            let tools: JSONValue = .array(configuration.tools.map {
-                .object(["name": .string($0.name), "description": .string($0.description), "parameters": $0.parameters])
-            })
+            let tools = Self.remoteTools(configuration.tools)
             let (conversationID, openedSeq) = try await openRemote(binding, client: client, context: context, tools: tools)
             try await applyRemoteSelection(client: client, conversationID: conversationID)
+            let startSeq = openedSeq ?? binding.lastSeq
+            if let startSeq, remoteAgent?.conversationID == conversationID { remoteAgent?.lastSeq = startSeq }
             let inbound = client.inbound(for: conversationID)
             client.setToolHandler({ [weak self] params in
                 await self?.callRemoteTool(params, tools: configuration.tools) ?? Self.remoteToolFailure("Ox conversation closed")
@@ -111,7 +112,7 @@ extension Conversation {
                     }
                     group.addTask { @MainActor in
                         await self.consumeRemote(inbound, events: events, client: client, session: RemoteSession(
-                            conversationID: conversationID, context: context, tools: tools, seq: openedSeq ?? binding.lastSeq))
+                            conversationID: conversationID, context: context, tools: tools, seq: startSeq))
                     }
                     var outcome = ConversationRunResult(outcome: .aborted)
                     for await value in group {
@@ -123,28 +124,94 @@ extension Conversation {
                     return outcome
                 }
             } onCancel: {
-                Task { @MainActor in
-                    do { _ = try await client.call("conversations.stop", .object(["id": .string(conversationID)]), timeout: .seconds(10)) }
-                    catch { Log.session.error("Conversation.remote stop failed conversation=\(conversationID) error=\(error.localizedDescription)") }
+                Self.stopRemote(client: client, conversationID: conversationID)
+            }
+        } catch {
+            result = Task.isCancelled ? ConversationRunResult(outcome: .aborted) : remoteFailure(error)
+        }
+        return await finishRemote(result)
+    }
+
+    func resumeRemoteRun() {
+        guard let binding = remoteAgent, let conversationID = binding.conversationID, let since = binding.lastSeq,
+              case .user? = turns.last else { return }
+        Log.session.info("Conversation.remote resume id=\(id) conversation=\(conversationID) since=\(since)")
+        resumeRun("remote=\(conversationID)") { await self.attachRemote(binding, conversationID: conversationID, since: since) }
+    }
+
+    private func attachRemote(_ binding: RemoteAgentBinding, conversationID: String, since: Int) async -> ConversationRunResult {
+        let client = RemoteAgentDirectory.shared.client(for: binding.endpoint)
+        let configuration = agentConfiguration(client: self.client, model: model)
+        let result: ConversationRunResult
+        do {
+            let context = try await remoteContext(configuration: configuration, turnState: await promptTurnState())
+            let tools = Self.remoteTools(configuration.tools)
+            let inbound = client.inbound(for: conversationID)
+            let opened = try await client.call("conversations.open", .object([
+                "id": .string(conversationID), "context": context, "tools": tools, "since": .int(since),
+            ]))
+            client.markOpen(conversationID)
+            let fields = opened.objectValue ?? [:]
+            let seq = fields["seq"]?.intValue ?? 0
+            let running = fields["state"]?.stringValue == "running"
+            Log.session.info("Conversation.remote attached id=\(id) since=\(since) seq=\(seq) running=\(running) replay=\(fields["replay"]?.stringValue ?? "none")")
+            if fields["replay"]?.stringValue != "complete" || seq < since {
+                result = ConversationRunResult(outcome: .failed(message: Self.remoteEndedAway, kind: .provider))
+            } else if seq == since, !running {
+                result = ConversationRunResult(outcome: .failed(message: String(localized: "This message didn't reach the agent. Send it again."), kind: .provider))
+            } else {
+                client.setToolHandler({ [weak self] params in
+                    await self?.callRemoteTool(params, tools: configuration.tools) ?? Self.remoteToolFailure("Ox conversation closed")
+                }, for: conversationID)
+                defer { client.setToolHandler(nil, for: conversationID) }
+                let events = RemoteAgentEvents(scope: scope, model: binding.model?.id ?? model.id)
+                let session = RemoteSession(conversationID: conversationID, context: context, tools: tools, seq: since)
+                result = await withTaskCancellationHandler {
+                    await consumeRemote(inbound, events: events, client: client, session: session)
+                } onCancel: {
+                    Self.stopRemote(client: client, conversationID: conversationID)
                 }
             }
         } catch {
             result = Task.isCancelled ? ConversationRunResult(outcome: .aborted) : remoteFailure(error)
         }
+        return await finishRemote(result)
+    }
+
+    private func finishRemote(_ result: ConversationRunResult) async -> ConversationRunResult {
         Log.session.info("Conversation.remote finished id=\(id) outcome=\(result.errorMessage ?? "completed")")
         await receiveAgentEvent(.runFinished(result))
-        await recordRemoteTurns()
+        await recordRemoteTurns(.reply)
         return result
     }
 
-    private func recordRemoteTurns() async {
+    private nonisolated static func stopRemote(client: RemoteAgentClient, conversationID: String) {
+        Task { @MainActor in
+            do { _ = try await client.call("conversations.stop", .object(["id": .string(conversationID)]), timeout: .seconds(10)) }
+            catch { Log.session.error("Conversation.remote stop failed conversation=\(conversationID) error=\(error.localizedDescription)") }
+        }
+    }
+
+    private static var remoteEndedAway: String {
+        String(localized: "The agent finished or restarted while Ox was away, so the end of this reply couldn't be shown. Send a message to continue.")
+    }
+
+    private static func remoteTools(_ tools: [any AgentTool]) -> JSONValue {
+        .array(tools.map { .object(["name": .string($0.name), "description": .string($0.description), "parameters": $0.parameters]) })
+    }
+
+    private func recordRemoteTurns(_ part: RemoteTurnRecord) async {
         guard let start = turns.lastIndex(where: { if case .user = $0 { true } else { false } }) else { return }
-        let recorded = Array(turns[start...])
+        let recorded = switch part {
+        case .request: [turns[start]]
+        case .reply: Array(turns[(start + 1)...])
+        }
+        guard !recorded.isEmpty else { return }
         do {
             try await Task { try await recordDurableTurns(recorded) }.value
-            Log.session.info("Conversation.remote recorded id=\(id) turns=\(recorded.count)")
+            Log.session.info("Conversation.remote recorded id=\(id) part=\(part) turns=\(recorded.count)")
         } catch {
-            Log.session.error("Conversation.remote record failed id=\(id) error=\(error.localizedDescription)")
+            Log.session.error("Conversation.remote record failed id=\(id) part=\(part) error=\(error.localizedDescription)")
         }
     }
 
@@ -288,9 +355,7 @@ extension Conversation {
                 let restarted = seq < (since ?? 0)
                 Log.session.info("Conversation.remote reconnected id=\(id) attempt=\(attempt) since=\(since ?? -1) seq=\(seq) replay=\(replay) restarted=\(restarted)")
                 guard replay == "gap" || restarted else { return .resumed(seq: since) }
-                if fields["state"]?.stringValue == "idle" || restarted {
-                    return .ended(String(localized: "The agent finished or restarted while Ox was away, so the end of this reply couldn't be shown. Send a message to continue."))
-                }
+                if fields["state"]?.stringValue == "idle" || restarted { return .ended(Self.remoteEndedAway) }
                 return .resumed(seq: seq)
             } catch {
                 Log.session.info("Conversation.remote reconnect id=\(id) attempt=\(attempt) error=\(LogPrivacy.text(error.localizedDescription, limit: 200))")
@@ -403,6 +468,11 @@ extension Conversation {
         do { _ = try await client.call("conversations.respond", .object(response)) }
         catch { Log.session.error("Conversation.remote respond failed id=\(id) error=\(error.localizedDescription)") }
     }
+}
+
+nonisolated enum RemoteTurnRecord: Sendable {
+    case request
+    case reply
 }
 
 nonisolated enum RemoteReconnect: Sendable {

@@ -24,6 +24,7 @@ final class Conversation: Identifiable {
             id = reference.compatibilityID.rawValue
         }
         durableRoute = route
+        if route != nil { resumeRemoteRun() }
     }
     @ObservationIgnored private var modelPreparationTask: Task<Void, Never>?
     @ObservationIgnored private var modelPreparationIntent = false
@@ -1607,6 +1608,10 @@ final class Conversation: Identifiable {
     }
 
     func resumeDurableSubmission(_ submissionID: Int, requestID: String?) {
+        resumeRun("submission=\(submissionID)") { try await self.resumeSubmission(submissionID, requestID: requestID) }
+    }
+
+    func resumeRun(_ label: String, _ work: @escaping @MainActor () async throws -> ConversationRunResult) {
         guard !isBusy else { return }
         let runID = RunID()
         submissionPresentation = .running
@@ -1616,7 +1621,7 @@ final class Conversation: Identifiable {
             guard let self else { return }
             defer { finishWorker(runID) }
             do {
-                let result = try await resumeSubmission(submissionID, requestID: requestID)
+                let result = try await work()
                 if let error = result.errorMessage, error != "aborted" { notice = .error(error) }
                 document.apply(.sealAllTurns)
                 markActivity(Date())
@@ -1624,7 +1629,7 @@ final class Conversation: Identifiable {
             } catch {
                 submissionPresentation = .completed
                 notice = .error(error.localizedDescription)
-                Log.session.error("Conversation.recovery failed conversation=\(id) submission=\(submissionID) error=\(error.localizedDescription)")
+                Log.session.error("Conversation.recovery failed conversation=\(id) \(label) error=\(error.localizedDescription)")
             }
         }
         activeRun = Run(id: runID, task: task, phase: .thinking, activeSubmission: nil)
@@ -1819,32 +1824,9 @@ final class Conversation: Identifiable {
             for svc in attachedServices { group.addTask { _ = await svc.loadManifest(reason: .attach) } }
         }
         submission.latency.mark(.manifestsReady)
-        let attached = attachedServices.map { $0.snapshot(attached: true) }
-        let grantedFolders = DeviceFolderStore.shared.grants(for: scope.profileID)
-        var turnSkills: [Skill] = []
-        var skillConflicts: [String] = []
-        do {
-            let catalog = try await skillsMount.catalog()
-            turnSkills = skillsMount.entries(in: catalog).map(\.skill)
-            skillConflicts = catalog.conflicts.filter { $0.selectedSourceID == nil }.map(\.name)
-        } catch {
-            Log.session.warning("Conversation.runOne skills unavailable id=\(id) fallback=empty error=\(error.localizedDescription)")
-        }
-        let turnState = ConversationPromptState.turn(
-            skills: turnSkills,
-            skillConflicts: skillConflicts,
-            services: attached,
-            fileRoots: fileSystemMounts.compactMap { $0.objectValue?["path"]?.stringValue }.filter { !$0.isEmpty },
-            grantedFolders: grantedFolders,
-            filePaths: referencedFiles.compactMap(\.virtualPath),
-            isTemporary: retention == .temporary,
-            responseLanguage: AppLocale.shared.responseLanguage,
-            children: conversationManager?.children(of: self) ?? [],
-            hostID: Device.hostID,
-            profileID: scope.profileID?.uuidString ?? "temporary:\(scope.generation.uuidString)"
-        )
+        let turnState = await promptTurnState()
         submission.latency.mark(.promptReady)
-        let attachedLog = attached.isEmpty ? "none" : attached.map(\.domain).joined(separator: ",")
+        let attachedLog = attachedServices.isEmpty ? "none" : attachedServices.map(\.domain).joined(separator: ",")
         Log.session.info("Conversation.runOne prompt id=\(id) attached=\(attachedLog) model=\(model.id) intentChars=\(submission.text.count) turnStateChars=\(turnState.jsonString().count) attachments=\(submission.attachments.count)")
         for definition in attachedServices.map(\.definition) {
             let actions = definition.actions
@@ -1934,6 +1916,33 @@ final class Conversation: Identifiable {
 
     var serviceBootstrapRevision: String {
         "\(id.uuidString):\(monoRepositoryRevision):\(attachedServices.map(\.domain).joined(separator: ","))"
+    }
+
+    func promptTurnState() async -> JSONValue {
+        let attached = attachedServices.map { $0.snapshot(attached: true) }
+        let grantedFolders = DeviceFolderStore.shared.grants(for: scope.profileID)
+        var turnSkills: [Skill] = []
+        var skillConflicts: [String] = []
+        do {
+            let catalog = try await skillsMount.catalog()
+            turnSkills = skillsMount.entries(in: catalog).map(\.skill)
+            skillConflicts = catalog.conflicts.filter { $0.selectedSourceID == nil }.map(\.name)
+        } catch {
+            Log.session.warning("Conversation.runOne skills unavailable id=\(id) fallback=empty error=\(error.localizedDescription)")
+        }
+        return ConversationPromptState.turn(
+            skills: turnSkills,
+            skillConflicts: skillConflicts,
+            services: attached,
+            fileRoots: fileSystemMounts.compactMap { $0.objectValue?["path"]?.stringValue }.filter { !$0.isEmpty },
+            grantedFolders: grantedFolders,
+            filePaths: referencedFiles.compactMap(\.virtualPath),
+            isTemporary: retention == .temporary,
+            responseLanguage: AppLocale.shared.responseLanguage,
+            children: conversationManager?.children(of: self) ?? [],
+            hostID: Device.hostID,
+            profileID: scope.profileID?.uuidString ?? "temporary:\(scope.generation.uuidString)"
+        )
     }
 
     var systemPromptMemory: String {
