@@ -99,27 +99,3 @@ struct ConversationChildrenChip: View {
         }
     }
 }
-
-struct ConversationParentLink: View {
-    let title: String?
-    let onOpen: () -> Void
-
-    var body: some View {
-        Button(action: onOpen) {
-            HStack(spacing: Theme.Spacing.xs) {
-                Image(systemName: "arrow.turn.up.left")
-                Text(verbatim: title.map { String(localized: "From \($0)") } ?? String(localized: "From a deleted conversation"))
-                    .lineLimit(1)
-            }
-            .font(Theme.Fonts.caption)
-            .foregroundStyle(Theme.Colors.onSurfaceMuted)
-            .padding(.horizontal, Theme.Spacing.md)
-            .frame(height: Theme.Size.chipHeight)
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .disabled(title == nil)
-        .minimumTouchTarget()
-        .accessibilityIdentifier(A11yID.ConversationControls.Children.parent)
-    }
-}

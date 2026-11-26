@@ -297,11 +297,6 @@ struct ConversationPage: View {
             .safeAreaBar(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {
                     pageTopBar(blockCount: totalBlockCount)
-                    if conversation.parentID != nil {
-                        ConversationParentLink(title: parentTitle) {
-                            if let parentID = conversation.parentID { onOpenConversation(parentID) }
-                        }
-                    }
                     if modelAccessNeedsAttention {
                         ConversationModelAccessNotice { modalPresentation = .modelPicker }
                     }
@@ -591,7 +586,9 @@ struct ConversationPage: View {
             conversation: conversation,
             blockCount: blockCount,
             hasFiles: !conversationFiles.isEmpty,
-            showsModelPicker: isModelConfigured,
+            parent: conversation.parentID.map { parentID in
+                ConversationAgentButton.Parent(title: parentTitle) { onOpenConversation(parentID) }
+            },
             iconButtonSize: iconButtonSize,
             onShowSidebar: onShowSidebar,
             onToggleTemporary: onToggleTemporary,

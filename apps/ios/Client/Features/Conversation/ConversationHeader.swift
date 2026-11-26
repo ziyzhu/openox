@@ -1,8 +1,9 @@
 import SwiftUI
 
 struct ConversationHeader<Trailing: View>: View {
-    let modelTitle: String?
-    var agentTitle = String(localized: "Current Device")
+    let title: String
+    var agentTitle: String?
+    var parent: ConversationAgentButton.Parent?
     let iconButtonSize: CGFloat
     let onShowSidebar: () -> Void
     let onPickModel: () -> Void
@@ -11,10 +12,8 @@ struct ConversationHeader<Trailing: View>: View {
     var body: some View {
         HStack(spacing: 8) {
             SidebarMenuButton(action: onShowSidebar)
-            if let modelTitle {
-                ConversationAgentButton(agent: agentTitle, model: modelTitle, size: iconButtonSize, action: onPickModel)
-            }
-            Spacer()
+            ConversationAgentButton(title: title, agent: agentTitle, parent: parent, size: iconButtonSize, action: onPickModel)
+                .frame(maxWidth: .infinity)
             trailing()
         }
         .padding(.horizontal, Theme.Spacing.lg)

@@ -62,7 +62,7 @@ struct OxDemoSceneView: View {
     private var conversation: some View {
         VStack(spacing: 0) {
             ConversationHeader(
-                modelTitle: playback.sent ? nil : "GPT-6 Sol · Fast",
+                title: playback.sent ? playback.conversation.prompt : String(localized: "New conversation"),
                 iconButtonSize: iconButtonSize,
                 onShowSidebar: {},
                 onPickModel: { playback.select(.providers) }

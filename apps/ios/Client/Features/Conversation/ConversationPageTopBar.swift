@@ -4,7 +4,7 @@ struct ConversationPageTopBar: View {
     let conversation: Conversation
     let blockCount: Int
     let hasFiles: Bool
-    let showsModelPicker: Bool
+    let parent: ConversationAgentButton.Parent?
     let iconButtonSize: CGFloat
     let onShowSidebar: () -> Void
     let onToggleTemporary: () -> Void
@@ -15,9 +15,9 @@ struct ConversationPageTopBar: View {
 
     var body: some View {
         ConversationHeader(
-            modelTitle: showsModelPicker && blockCount == 0 && (conversation.canChangeRetention || !conversation.isTemporary)
-                ? conversation.remoteAgent.map { _ in conversation.remoteModelName ?? String(localized: "Agent default") } ?? conversation.model.displayName : nil,
-            agentTitle: conversation.remoteAgentName ?? String(localized: "Current Device"),
+            title: conversation.title,
+            agentTitle: conversation.remoteAgentName,
+            parent: parent,
             iconButtonSize: iconButtonSize,
             onShowSidebar: onShowSidebar,
             onPickModel: onPickModel
@@ -35,7 +35,7 @@ struct ConversationPageTopBar: View {
             Button(action: onPickModel) {
                 Label(conversation.remoteAgent == nil ? "Models" : "Model", systemImage: "slider.horizontal.3")
             }
-            .accessibilityIdentifier(A11yID.ConversationControls.agentPicker)
+            .accessibilityIdentifier(A11yID.ConversationControls.modelMenuItem)
             if hasFiles || blockCount > 0 {
                 Divider()
             }

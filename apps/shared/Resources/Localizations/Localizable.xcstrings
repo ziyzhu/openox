@@ -97,6 +97,17 @@
         }
       }
     },
+    "Agent and Model" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能体和模型"
+          }
+        }
+      }
+    },
     "Agent default" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -104,6 +115,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "智能体默认"
+          }
+        }
+      }
+    },
+    "Agent: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能体：%@"
           }
         }
       }
@@ -167,6 +189,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "查看对话"
+          }
+        }
+      }
+    },
+    "Deleted conversation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已删除的对话"
           }
         }
       }
@@ -246,6 +279,28 @@
         }
       }
     },
+    "Open %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 %@"
+          }
+        }
+      }
+    },
+    "Opens agent and model settings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开智能体和模型设置"
+          }
+        }
+      }
+    },
     "Own folder" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -253,6 +308,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "独立文件夹"
+          }
+        }
+      }
+    },
+    "Parent was deleted" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上级对话已删除"
           }
         }
       }
@@ -305,6 +371,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "终端"
+          }
+        }
+      }
+    },
+    "Shows the parent conversation and agent settings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示上级对话和智能体设置"
           }
         }
       }
