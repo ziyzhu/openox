@@ -1,5 +1,7 @@
 import { randomBytes } from "node:crypto";
+import { stat, realpath } from "node:fs/promises";
 import { hostname } from "node:os";
+import { resolve } from "node:path";
 import type { ServerWebSocket } from "bun";
 import { Value } from "typebox/value";
 import {
@@ -14,21 +16,24 @@ import {
   type AgentRespondRequest,
   type AgentTool,
 } from "@openox/protocol/agent";
+import { DEFAULT_EVENT_LIMITS, EventLog, type EventLimits } from "./agent-events.ts";
 import { agentLog } from "./agent-log.ts";
 import { BRIDGE_ENVIRONMENT, writePiExtension } from "./agent-pi-extension.ts";
 import { approvalArguments, exitMessage, PiProcess, piVersion, type Approval, type PiExit, type PiRecord } from "./agent-pi.ts";
-import { OriginStore, SessionIndex } from "./agent-sessions.ts";
+import { OriginStore, SessionIndex, within } from "./agent-sessions.ts";
+import { admission, HEALTH_NAME, type Tailnet } from "./agent-tailscale.ts";
 import { ToolBridge } from "./agent-tools.ts";
 
-export type AgentSocket = ServerWebSocket<{ id: string; conversations: Set<string> }>;
+export type AgentSocket = ServerWebSocket<{ id: string; conversations: Set<string>; via: "loopback" | "tailnet" }>;
 export type AgentServeOptions = {
-  cwd: string;
+  roots: string[];
   approval: Approval;
   executable: string;
   stateDirectory: string;
-  hostname: string;
   port: number;
+  tailnet?: Tailnet;
   idleCloseMs?: number;
+  eventLimits?: EventLimits;
 };
 
 type RunState = "idle" | "running";
@@ -38,6 +43,7 @@ type ProcessState =
   | { kind: "live"; pi: PiProcess; run: RunState };
 type Conversation = {
   id: string;
+  cwd: string;
   context: AgentContext;
   tools: AgentTool[];
   title: string | null;
@@ -45,6 +51,7 @@ type Conversation = {
   process: ProcessState;
   prompts: Map<string, AgentPromptNotification>;
   activeTools: Set<string>;
+  events: EventLog;
   idleTimer?: ReturnType<typeof setTimeout>;
 };
 type PiState = {
@@ -55,8 +62,8 @@ type PiState = {
   sessionName?: string;
 };
 type Handler = (params: never, socket: AgentSocket) => Promise<unknown>;
-type NewParams = { model?: AgentModelRef | null; thinkingLevel?: string | null; context: AgentContext; tools: AgentTool[] };
-type OpenParams = { id: string; context: AgentContext; tools: AgentTool[] };
+type NewParams = { cwd?: string | null; model?: AgentModelRef | null; thinkingLevel?: string | null; context: AgentContext; tools: AgentTool[] };
+type OpenParams = { id: string; context: AgentContext; tools: AgentTool[]; since?: number };
 type SendParams = {
   id: string;
   text: string;
@@ -72,6 +79,14 @@ const MODELS_CACHE_MS = 60 * 1000;
 const PI_FAILURE = -32000;
 const UNKNOWN_CONVERSATION = -32001;
 const UNKNOWN_PROMPT = -32002;
+
+class Subscribed {
+  readonly complete: (reply: (result: unknown) => void) => void;
+
+  constructor(complete: (reply: (result: unknown) => void) => void) {
+    this.complete = complete;
+  }
+}
 
 class RPCError extends Error {
   readonly code: number;
@@ -119,36 +134,43 @@ export class AgentServer {
     this.version = version;
     this.extensionPath = extensionPath;
     this.origins = origins;
-    this.sessions = new SessionIndex(options.cwd);
+    this.sessions = new SessionIndex(options.roots);
     this.bridge = new ToolBridge((token) => {
       const conversation = this.conversations.get(this.tokens.get(token) ?? "");
       return conversation && { id: conversation.id, context: conversation.context, tools: conversation.tools, host: () => [...conversation.subscribers].at(-1) };
     });
     this.bridgeURL = this.bridge.start();
     this.server = Bun.serve({
-      hostname: options.hostname,
+      hostname: "127.0.0.1",
       port: options.port,
       fetch: (request, server) => {
-        const data = { id: Bun.randomUUIDv7(), conversations: new Set<string>() };
+        const admitted = admission(request.headers, server.port ?? options.port, options.tailnet);
+        if (admitted.kind === "rejected") {
+          agentLog("connection.rejected", { reason: admitted.reason, path: new URL(request.url).pathname });
+          return new Response("Forbidden", { status: 403 });
+        }
+        if (request.method === "GET" && new URL(request.url).pathname === "/health") {
+          return Response.json({ name: HEALTH_NAME, protocol: AGENT_PROTOCOL_VERSION });
+        }
+        const data = { id: Bun.randomUUIDv7(), conversations: new Set<string>(), via: admitted.via };
         if (server.upgrade(request, { data })) return undefined;
         return new Response("ox agent serve accepts WebSocket JSON-RPC connections", { status: 426 });
       },
       websocket: {
         data: {} as AgentSocket["data"],
-        open: (socket) => agentLog("connection.open", { connection: socket.data.id, remote: socket.remoteAddress }),
+        open: (socket) => agentLog("connection.open", { connection: socket.data.id, via: socket.data.via }),
         message: (socket, message) => this.receive(socket, typeof message === "string" ? message : new TextDecoder().decode(message)),
         close: (socket, code) => this.disconnect(socket, code),
       },
     });
-    const host = options.hostname.includes(":") ? `[${options.hostname}]` : options.hostname;
-    this.url = `ws://${host}:${this.server.port}`;
+    this.url = `ws://127.0.0.1:${this.server.port}`;
   }
 
   static async start(options: AgentServeOptions): Promise<AgentServer> {
     const origins = new OriginStore(options.stateDirectory);
     const [version, extensionPath] = await Promise.all([piVersion(options.executable), writePiExtension(options.stateDirectory), origins.load()]);
     const server = new AgentServer(options, version, extensionPath, origins);
-    agentLog("serve.start", { url: server.url, folder: options.cwd, pi: version, approval: options.approval });
+    agentLog("serve.start", { url: server.url, folders: options.roots.length, tailnet: options.tailnet !== undefined, pi: version, approval: options.approval });
     return server;
   }
 
@@ -184,7 +206,8 @@ export class AgentServer {
     const conversation = params && typeof params === "object" && typeof (params as { id?: unknown }).id === "string" ? (params as { id: string }).id : undefined;
     try {
       const result = await this.dispatch(socket, method, params ?? {});
-      this.reply(socket, id, { result });
+      if (result instanceof Subscribed) result.complete((value) => this.reply(socket, id, { result: value }));
+      else this.reply(socket, id, { result });
       const created = method === "conversations.new" ? (result as { id: string }).id : undefined;
       agentLog("rpc.call", { connection: socket.data.id, method, conversation: conversation ?? created, durationMs: Math.round(performance.now() - started), ok: true });
     } catch (error) {
@@ -241,7 +264,8 @@ export class AgentServer {
     return {
       implementation: { name: "pi", version: this.version },
       machine: hostname(),
-      folder: this.options.cwd,
+      folder: this.options.roots[0]!,
+      folders: this.options.roots,
       protocols: { agent: [AGENT_PROTOCOL_VERSION] },
       methods: Object.keys(this.handlers),
     };
@@ -257,7 +281,7 @@ export class AgentServer {
   }
 
   private async fetchModels(): Promise<{ models: AgentModel[]; current: AgentModelRef | null }> {
-    const pi = new PiProcess(this.options.executable, ["--no-session", ...approvalArguments(this.options.approval)], { cwd: this.options.cwd, label: "models" }, () => {});
+    const pi = new PiProcess(this.options.executable, ["--no-session", ...approvalArguments(this.options.approval)], { cwd: this.options.roots[0]!, label: "models" }, () => {});
     try {
       const [available, state] = await withTimeout(
         Promise.all([pi.command<{ models: Record<string, unknown>[] }>("get_available_models"), pi.command<PiState>("get_state")]),
@@ -273,20 +297,20 @@ export class AgentServer {
   private async listConversations() {
     const files = await this.sessions.list();
     const known = new Set(files.map((file) => file.id));
-    const rows = files.map((file) => this.row(file.id, file.title, file.updatedAt));
+    const rows = files.map((file) => this.row(file.id, file.cwd, file.title, file.updatedAt));
     for (const conversation of this.conversations.values()) {
-      if (!known.has(conversation.id) && conversation.process.kind !== "stopped") rows.push(this.row(conversation.id, "", new Date().toISOString()));
+      if (!known.has(conversation.id) && conversation.process.kind !== "stopped") rows.push(this.row(conversation.id, conversation.cwd, "", new Date().toISOString()));
     }
     rows.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
     return { conversations: rows };
   }
 
-  private row(id: string, fileTitle: string, updatedAt: string) {
+  private row(id: string, cwd: string, fileTitle: string, updatedAt: string) {
     const conversation = this.conversations.get(id);
     return {
       id,
       title: conversation?.title ?? fileTitle,
-      cwd: this.options.cwd,
+      cwd,
       state: conversation && this.runState(conversation) === "running" ? "running" as const : "idle" as const,
       origin: this.origins.has(id) ? "ox" as const : "terminal" as const,
       updatedAt,
@@ -294,8 +318,9 @@ export class AgentServer {
   }
 
   private async create(params: NewParams, socket: AgentSocket) {
+    const cwd = await this.folder(params.cwd);
     const id = Bun.randomUUIDv7();
-    const conversation = this.register(id, params.context, params.tools, null);
+    const conversation = this.register(id, cwd, params.context, params.tools, null);
     this.subscribe(conversation, socket);
     try {
       const pi = await this.launch(conversation, ["--session-id", id]);
@@ -320,23 +345,43 @@ export class AgentServer {
       conversation.tools = params.tools;
     } else {
       const file = await this.sessions.find(params.id);
-      if (!file) throw new RPCError(UNKNOWN_CONVERSATION, `Unknown conversation ${params.id} in ${this.options.cwd}`);
-      conversation = this.register(params.id, params.context, params.tools, file.title || null);
+      if (!file) throw new RPCError(UNKNOWN_CONVERSATION, `Unknown conversation ${params.id} in the allowed folders`);
+      conversation = this.register(params.id, file.cwd, params.context, params.tools, file.title || null);
     }
-    this.subscribe(conversation, socket);
-    const pi = await this.ensure(conversation);
-    const [{ messages }, state] = await Promise.all([pi.command<{ messages: unknown[] }>("get_messages"), pi.command<PiState>("get_state")]);
-    const pending = [...conversation.prompts.values()];
-    setTimeout(() => {
-      for (const prompt of pending) this.sendText(socket, JSON.stringify({ jsonrpc: "2.0", method: "conversations.prompt", params: prompt }));
-    }, 0);
-    return {
-      messages,
-      state: this.runState(conversation) === "running" ? "running" : "idle",
-      model: modelRef(state.model),
-      thinkingLevel: state.thinkingLevel ?? null,
-      title: conversation.title,
-    };
+    const opened = conversation;
+    clearTimeout(opened.idleTimer);
+    const [{ messages }, state] = await this.ensure(opened)
+      .then((pi) => Promise.all([pi.command<{ messages: unknown[] }>("get_messages"), pi.command<PiState>("get_state")]))
+      .catch((error: Error) => {
+        this.scheduleIdleClose(opened);
+        throw error;
+      });
+    return new Subscribed((reply) => {
+      const replay = opened.events.since(params.since ?? opened.events.seq);
+      reply({
+        messages,
+        state: this.runState(opened) === "running" ? "running" : "idle",
+        model: modelRef(state.model),
+        thinkingLevel: state.thinkingLevel ?? null,
+        title: opened.title,
+        seq: replay.seq,
+        replay: params.since === undefined ? undefined : replay.replay,
+      });
+      for (const text of replay.texts) this.sendText(socket, text);
+      this.subscribe(opened, socket);
+      for (const prompt of opened.prompts.values()) this.sendText(socket, JSON.stringify({ jsonrpc: "2.0", method: "conversations.prompt", params: prompt }));
+      if (params.since !== undefined) agentLog("conversation.replay", { connection: socket.data.id, conversation: opened.id, events: replay.texts.length, replay: replay.replay });
+    });
+  }
+
+  private async folder(requested: string | null | undefined): Promise<string> {
+    const [first] = this.options.roots;
+    if (!requested) return first!;
+    const path = await realpath(resolve(first!, requested)).catch(() => undefined);
+    const directory = path && await stat(path).then((info) => info.isDirectory(), () => false);
+    if (!path || !directory) throw new RPCError(-32602, "folder does not exist");
+    if (!within(this.options.roots, path)) throw new RPCError(-32602, "folder outside allowed roots");
+    return path;
   }
 
   private async close(id: string, socket: AgentSocket) {
@@ -393,9 +438,10 @@ export class AgentServer {
     return conversation;
   }
 
-  private register(id: string, context: AgentContext, tools: AgentTool[], title: string | null): Conversation {
+  private register(id: string, cwd: string, context: AgentContext, tools: AgentTool[], title: string | null): Conversation {
     const conversation: Conversation = {
-      id, context, tools, title, subscribers: new Set(), process: { kind: "stopped" }, prompts: new Map(), activeTools: new Set(),
+      id, cwd, context, tools, title, subscribers: new Set(), process: { kind: "stopped" }, prompts: new Map(), activeTools: new Set(),
+      events: new EventLog(this.options.eventLimits ?? DEFAULT_EVENT_LIMITS),
     };
     this.conversations.set(id, conversation);
     return conversation;
@@ -420,7 +466,8 @@ export class AgentServer {
     if (conversation.subscribers.size || process.kind !== "live" || process.run !== "idle") return;
     conversation.idleTimer = setTimeout(() => {
       if (conversation.subscribers.size || conversation.process !== process || process.run !== "idle") return;
-      agentLog("pi.idle_close", { conversation: conversation.id, pid: process.pi.pid });
+      agentLog("pi.idle_close", { conversation: conversation.id, pid: process.pi.pid, seq: conversation.events.seq });
+      conversation.events.clear();
       void process.pi.shutdown();
     }, this.options.idleCloseMs ?? IDLE_CLOSE_MS);
   }
@@ -445,7 +492,7 @@ export class AgentServer {
     const pi: PiProcess = new PiProcess(
       this.options.executable,
       [...sessionArguments, "-e", this.extensionPath, ...approvalArguments(this.options.approval)],
-      { cwd: this.options.cwd, env: { [BRIDGE_ENVIRONMENT]: `${this.bridgeURL}/${token}` }, label: conversation.id },
+      { cwd: conversation.cwd, env: { [BRIDGE_ENVIRONMENT]: `${this.bridgeURL}/${token}` }, label: conversation.id },
       (record) => this.receivePi(conversation, pi, record),
     );
     this.tokens.set(token, conversation.id);
@@ -483,7 +530,8 @@ export class AgentServer {
       this.extensionRequest(conversation, record);
       return;
     }
-    this.notify(conversation, "conversations.event", { id: conversation.id, event: record });
+    const text = conversation.events.append((seq) => JSON.stringify({ jsonrpc: "2.0", method: "conversations.event", params: { id: conversation.id, seq, event: record } }));
+    for (const socket of conversation.subscribers) this.sendText(socket, text);
     if (record.type === "agent_start") this.setRun(conversation, pi, "running");
     else if (record.type === "agent_settled") this.setRun(conversation, pi, "idle");
     else if (record.type === "session_info_changed") this.retitle(conversation, typeof record.name === "string" ? record.name : null);

@@ -1,6 +1,6 @@
 import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 
 export type SessionSummary = { id: string; path: string; cwd: string; title: string; updatedAt: string };
 
@@ -23,28 +23,44 @@ async function configuredSessionDirectory(cwd: string): Promise<string | undefin
   return typeof value === "string" && value ? resolve(cwd, expandHome(value)) : undefined;
 }
 
-export async function sessionDirectory(cwd: string): Promise<string> {
-  const configured = await configuredSessionDirectory(cwd);
-  if (configured) return configured;
-  const safe = `--${cwd.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}--`;
-  return join(piAgentDirectory(), "sessions", safe);
+function encodedDirectory(cwd: string): string {
+  return `--${cwd.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}`;
+}
+
+export function within(roots: readonly string[], path: string): boolean {
+  return roots.some((root) => {
+    const offset = relative(root, path);
+    return offset === "" || (!offset.startsWith("..") && !isAbsolute(offset));
+  });
+}
+
+async function sessionDirectories(roots: readonly string[]): Promise<string[]> {
+  const configured = await Promise.all(roots.map(configuredSessionDirectory));
+  if (configured.every((directory) => directory !== undefined)) return [...new Set(configured)];
+  const parent = join(piAgentDirectory(), "sessions");
+  const prefixes = roots.map(encodedDirectory);
+  const names = await readdir(parent).catch(() => [] as string[]);
+  return names.filter((name) => prefixes.some((prefix) => name.startsWith(prefix))).map((name) => join(parent, name));
 }
 
 type Cached = { mtimeMs: number; size: number; summary: SessionSummary | undefined };
 
 export class SessionIndex {
   private readonly cache = new Map<string, Cached>();
-  private readonly cwd: string;
+  private readonly roots: readonly string[];
 
-  constructor(cwd: string) {
-    this.cwd = cwd;
+  constructor(roots: readonly string[]) {
+    this.roots = roots;
   }
 
   async list(): Promise<SessionSummary[]> {
-    const directory = await sessionDirectory(this.cwd);
-    const names = await readdir(directory).catch(() => [] as string[]);
-    const summaries = await Promise.all(names.filter((name) => name.endsWith(".jsonl")).map((name) => this.summary(join(directory, name))));
-    return summaries.filter((summary): summary is SessionSummary => summary !== undefined && summary.cwd === this.cwd);
+    const directories = await sessionDirectories(this.roots);
+    const paths = (await Promise.all(directories.map(async (directory) => {
+      const names = await readdir(directory).catch(() => [] as string[]);
+      return names.filter((name) => name.endsWith(".jsonl")).map((name) => join(directory, name));
+    }))).flat();
+    const summaries = await Promise.all(paths.map((path) => this.summary(path)));
+    return summaries.filter((summary): summary is SessionSummary => summary !== undefined && within(this.roots, summary.cwd));
   }
 
   async find(id: string): Promise<SessionSummary | undefined> {

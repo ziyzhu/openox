@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Value } from "typebox/value";
 import { AgentMethods, AgentSchemas } from "@openox/protocol/agent";
 import { AgentClient, AgentRPCError } from "./agent-client.ts";
 import { AgentServer } from "./agent-serve.ts";
+import { admission } from "./agent-tailscale.ts";
 
 const executable = process.env.OX_AGENT_PI ?? Bun.which("pi");
 const timeout = 60000;
@@ -13,6 +14,8 @@ const context = { sections: { ox_test: "Always end replies with the word PINEAPP
 const tools = [{ name: "execute", description: "Run JavaScript on the Ox Host.", parameters: { type: "object", properties: { source: { type: "string" } }, required: ["source"] } }];
 
 let root = "";
+let workspace = "";
+let second = "";
 let server: AgentServer;
 let client: AgentClient;
 const notifications: { method: string; params: Record<string, unknown> }[] = [];
@@ -29,9 +32,13 @@ async function rejection(promise: Promise<unknown>): Promise<AgentRPCError> {
 
 beforeAll(async () => {
   root = await realpath(await mkdtemp(join(tmpdir(), "ox-agent-serve-")));
+  workspace = join(root, "workspace");
+  second = join(root, "second");
+  await Promise.all([mkdir(join(workspace, "nested"), { recursive: true }), mkdir(second), mkdir(join(root, "outside"))]);
   process.env.PI_CODING_AGENT_SESSION_DIR = join(root, "sessions");
   server = await AgentServer.start({
-    cwd: root, approval: "no-approve", executable: executable!, stateDirectory: join(root, "state"), hostname: "127.0.0.1", port: 0,
+    roots: [workspace, second], approval: "no-approve", executable: executable!, stateDirectory: join(root, "state"), port: 0,
+    eventLimits: { events: 4, bytes: 1024 * 1024 },
   });
   client = await AgentClient.connect(server.url);
   client.onNotification = (method, params) => notifications.push({ method, params });
@@ -48,7 +55,8 @@ test.skipIf(!executable)("serves pi conversations over JSON-RPC", async () => {
   const description = await client.request("agent.describe");
   expect(valid("AgentDescription", description)).toBe(true);
   expect(description.implementation).toMatchObject({ name: "pi" });
-  expect(description.folder).toBe(root);
+  expect(description.folder).toBe(workspace);
+  expect(description.folders).toEqual([workspace, second]);
   expect(description.methods).toEqual(Object.keys(AgentMethods));
 
   const models = await client.request<{ models: unknown[] }>("models.list", {}, timeout);
@@ -65,6 +73,7 @@ test.skipIf(!executable)("serves pi conversations over JSON-RPC", async () => {
   const opened = await client.request("conversations.open", { id: created.id, context, tools }, timeout);
   expect(valid("AgentOpenResult", opened)).toBe(true);
   expect(opened).toMatchObject({ messages: [], state: "idle" });
+  expect(opened.replay).toBeUndefined();
 
   await client.request("conversations.rename", { id: created.id, title: "Agent serve check" });
   const renamed = await client.request<{ conversations: { id: string; title: string }[] }>("conversations.list");
@@ -76,3 +85,71 @@ test.skipIf(!executable)("serves pi conversations over JSON-RPC", async () => {
   expect((await rejection(client.request("conversations.send", { id: created.id }))).code).toBe(-32602);
   expect((await rejection(client.request("conversations.unknown"))).code).toBe(-32601);
 }, timeout * 3);
+
+test.skipIf(!executable)("creates conversations only inside the allowed folders", async () => {
+  const outside = await rejection(client.request("conversations.new", { cwd: join(root, "outside"), context, tools }));
+  expect(outside).toMatchObject({ code: -32602, message: "folder outside allowed roots" });
+  const escaped = await rejection(client.request("conversations.new", { cwd: "../outside", context, tools }));
+  expect(escaped.code).toBe(-32602);
+  const nested = await client.request<{ id: string }>("conversations.new", { cwd: join(workspace, "nested"), context, tools }, timeout);
+  await client.request("conversations.rename", { id: nested.id, title: "Nested" });
+  const listed = await client.request<{ conversations: { id: string; cwd: string }[] }>("conversations.list");
+  expect(listed.conversations.find((row) => row.id === nested.id)?.cwd).toBe(join(workspace, "nested"));
+}, timeout * 2);
+
+test.skipIf(!executable)("replays buffered events after the open result", async () => {
+  const created = await client.request<{ id: string }>("conversations.new", { context, tools }, timeout);
+  for (const title of ["one", "two", "three", "four", "five", "six"]) await client.request("conversations.rename", { id: created.id, title });
+  const events = notifications.filter((note) => note.method === "conversations.event" && note.params.id === created.id).map((note) => note.params.seq);
+  expect(events).toEqual([1, 2, 3, 4, 5, 6]);
+
+  const reconnect = async (since: number) => {
+    const other = await AgentClient.connect(server.url);
+    const received: { seq: unknown; afterResult: boolean }[] = [];
+    let answered = false;
+    other.onNotification = (method, params) => {
+      if (method === "conversations.event" && params.id === created.id) received.push({ seq: params.seq, afterResult: answered });
+    };
+    const result = await other.request<{ seq: number; replay: string }>("conversations.open", { id: created.id, context, tools, since }, timeout)
+      .finally(() => { answered = true; });
+    await Bun.sleep(100);
+    other.close();
+    return { result, received };
+  };
+
+  const complete = await reconnect(4);
+  expect(valid("AgentOpenResult", complete.result)).toBe(true);
+  expect(complete.result).toMatchObject({ seq: 6, replay: "complete" });
+  expect(complete.received).toEqual([{ seq: 5, afterResult: true }, { seq: 6, afterResult: true }]);
+
+  const gap = await reconnect(0);
+  expect(gap.result).toMatchObject({ seq: 6, replay: "gap" });
+  expect(gap.received.map((event) => event.seq)).toEqual([3, 4, 5, 6]);
+
+  const future = await reconnect(9);
+  expect(future.result).toMatchObject({ seq: 6, replay: "gap" });
+  expect(future.received).toEqual([]);
+}, timeout * 2);
+
+test("admits loopback processes and the tailnet owner only", () => {
+  const tailnet = { name: "mac.example.ts.net", login: "owner@example.com" };
+  const check = (headers: Record<string, string>) => admission(new Headers(headers), 9878, tailnet);
+  const local = (headers: Record<string, string>) => admission(new Headers(headers), 9878, undefined);
+  expect(check({ host: "127.0.0.1:9878" })).toEqual({ kind: "allowed", via: "loopback" });
+  expect(local({ host: "localhost:9878" })).toEqual({ kind: "allowed", via: "loopback" });
+  expect(check({ host: "mac.example.ts.net:9878", "tailscale-user-login": "owner@example.com" })).toEqual({ kind: "allowed", via: "tailnet" });
+  expect(check({ host: "mac.example.ts.net:9878", "tailscale-user-login": "guest@example.com" })).toEqual({ kind: "rejected", reason: "not_owner" });
+  expect(check({ host: "mac.example.ts.net:9878" })).toEqual({ kind: "rejected", reason: "missing_identity" });
+  expect(local({ host: "mac.example.ts.net:9878", "tailscale-user-login": "owner@example.com" })).toEqual({ kind: "rejected", reason: "unknown_host" });
+  expect(check({ host: "127.0.0.1:9878", "tailscale-user-login": "owner@example.com" })).toEqual({ kind: "rejected", reason: "forwarded_loopback" });
+  expect(check({ host: "127.0.0.1:9878", "x-forwarded-for": "100.64.0.9" })).toEqual({ kind: "rejected", reason: "forwarded_loopback" });
+  expect(check({ host: "127.0.0.1:9999" })).toEqual({ kind: "rejected", reason: "unknown_host" });
+  expect(check({ host: "evil.example" })).toEqual({ kind: "rejected", reason: "unknown_host" });
+  expect(check({})).toEqual({ kind: "rejected", reason: "unknown_host" });
+});
+
+test.skipIf(!executable)("serves health and rejects foreign hosts", async () => {
+  const url = server.url.replace("ws://", "http://");
+  expect(await (await fetch(`${url}/health`)).json()).toEqual({ name: "ox-agent", protocol: 1 });
+  expect((await fetch(`${url}/health`, { headers: { host: "evil.example" } })).status).toBe(403);
+});

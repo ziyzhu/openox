@@ -43,7 +43,7 @@ nonisolated struct RemoteAgentModel: Equatable, Hashable, Identifiable, Sendable
 
 nonisolated enum RemoteAgentStatus: Equatable, Sendable {
     case checking
-    case online(implementation: String, version: String, machine: String, folder: String)
+    case online(implementation: String, version: String, machine: String, folders: [String])
     case offline(String)
 
     var isOnline: Bool { if case .online = self { true } else { false } }
@@ -53,7 +53,7 @@ nonisolated enum RemoteAgentStatus: Equatable, Sendable {
 @Observable
 final class RemoteAgentDirectory {
     static let shared = RemoteAgentDirectory()
-    static let defaultPort = 9877
+    static let defaultPort = 9878
 
     private(set) var configuration: RemoteAgentConfiguration
     private(set) var statuses: [URL: RemoteAgentStatus] = [:]
@@ -130,11 +130,13 @@ final class RemoteAgentDirectory {
         do {
             let description = try await client.call("agent.describe", timeout: .seconds(5)).objectValue ?? [:]
             let implementation = description["implementation"]?.objectValue
+            let listed: [String]? = description["folders"]?.arrayValue?.compactMap(\.stringValue)
+            let folders: [String] = listed ?? description["folder"]?.stringValue.map { [$0] } ?? []
             statuses[endpoint] = .online(
                 implementation: implementation?["name"]?.stringValue ?? "agent",
                 version: implementation?["version"]?.stringValue ?? "",
                 machine: description["machine"]?.stringValue ?? endpoint.host() ?? "",
-                folder: description["folder"]?.stringValue ?? ""
+                folders: folders
             )
             let listing = try await client.call("models.list", timeout: .seconds(30)).objectValue ?? [:]
             models[endpoint] = (listing["models"]?.arrayValue ?? []).compactMap(Self.model)
@@ -154,6 +156,15 @@ final class RemoteAgentDirectory {
         if case .online(_, _, let machine, _) = statuses[endpoint] { machine } else { nil }
     }
 
+    func folders(for endpoint: URL) -> [String] {
+        if case .online(_, _, _, let folders) = statuses[endpoint] { folders } else { [] }
+    }
+
+    func agent(named name: String) -> RemoteAgent? {
+        let wanted = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return configuration.agents.first { $0.name.compare(wanted, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame }
+    }
+
     func modelName(_ reference: AgentModelReference?, endpoint: URL) -> String? {
         guard let reference = reference ?? defaultModels[endpoint] else { return nil }
         return models[endpoint]?.first { $0.reference == reference }?.name ?? reference.id
@@ -162,10 +173,11 @@ final class RemoteAgentDirectory {
     static func endpoint(from input: String) -> URL? {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        let text = trimmed.contains("://") ? trimmed : "ws://\(trimmed)"
+        let bare = !trimmed.contains("://")
+        let text = bare ? "\(trimmed.hasSuffix(".ts.net") || trimmed.contains(".ts.net:") ? "wss" : "ws")://\(trimmed)" : trimmed
         guard var components = URLComponents(string: text), let scheme = components.scheme?.lowercased(),
               ["ws", "wss"].contains(scheme), let host = components.host, !host.isEmpty else { return nil }
-        if scheme == "ws", components.port == nil { components.port = defaultPort }
+        if components.port == nil, scheme == "ws" || host.hasSuffix(".ts.net") { components.port = defaultPort }
         if components.path == "/" { components.path = "" }
         return components.url
     }

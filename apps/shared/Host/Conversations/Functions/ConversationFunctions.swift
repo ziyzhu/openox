@@ -37,7 +37,11 @@ extension Conversation {
         }
         let title = fields["title"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
         let domains = fields["services"]?.arrayValue?.compactMap(\.stringValue) ?? []
-        let args: JSONValue = .object(["prompt": .string(prompt), "title": .string(title ?? ""), "services": .array(domains.map(JSONValue.string))])
+        let agent = try Self.childAgent(fields)
+        var argFields: [String: JSONValue] = ["prompt": .string(prompt), "title": .string(title ?? ""), "services": .array(domains.map(JSONValue.string))]
+        if let agent { argFields["agent"] = .string(RemoteAgentDirectory.shared.displayName(for: agent.endpoint)) }
+        if let folder = agent?.folder { argFields["folder"] = .string(folder) }
+        let args: JSONValue = .object(argFields)
         return try await tracked(Actions.conversationStart, args, purpose: purpose) {
             try self.requireProfileMutation(Actions.conversationStart)
             guard let manager = self.conversationManager else {
@@ -48,9 +52,25 @@ extension Conversation {
                 locale: AppLocale.shared.serviceLocale(for: AppRegion.shared.region)
             )
             try Task.checkCancellation()
-            let child = try await manager.startChild(prompt: prompt, title: title, services: services, requestedBy: self)
+            let child = try await manager.startChild(prompt: prompt, title: title, services: services, agent: agent, requestedBy: self)
             return Self.childValue(child)
         }
+    }
+
+    private static func childAgent(_ fields: [String: JSONValue]) throws -> RemoteAgentBinding? {
+        guard let name = fields["agent"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
+            if fields["folder"] != nil { throw RuntimeError.bridge("ox.conversation.start: folder requires agent.") }
+            return nil
+        }
+        let directory = RemoteAgentDirectory.shared
+        guard let agent = directory.agent(named: name) else {
+            let names = directory.agents.map(\.name)
+            throw OxFunctionError(code: "unknown_agent", message: "ox.conversation.start: no agent named \"\(name)\".",
+                recovery: names.isEmpty ? "No remote agents are set up; omit agent to run on this device, or ask the user to add one in Settings → Agents."
+                    : "Use one of: \(names.joined(separator: ", ")); or omit agent to run on this device.")
+        }
+        let folder = fields["folder"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return RemoteAgentBinding(endpoint: agent.endpoint, model: directory.defaultModels[agent.endpoint], folder: folder?.isEmpty == false ? folder : nil)
     }
 
     public func sendChildConversation(id: String, text: String, purpose: String) async throws -> JSONValue? {

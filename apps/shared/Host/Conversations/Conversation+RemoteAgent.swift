@@ -37,6 +37,13 @@ extension Conversation {
         }
     }
 
+    func selectRemoteFolder(_ folder: String) {
+        guard canChangeAgent, var binding = remoteAgent, binding.conversationID == nil else { return }
+        binding.folder = folder
+        remoteAgent = binding
+        Log.session.info("Conversation.agent folder id=\(id) chars=\(folder.count)")
+    }
+
     func submitRemote(_ input: ConversationInput, configuration: AgentConfiguration, binding: RemoteAgentBinding) async throws -> ConversationRunResult {
         let client = RemoteAgentDirectory.shared.client(for: binding.endpoint)
         let result: ConversationRunResult
@@ -46,7 +53,7 @@ extension Conversation {
             let tools: JSONValue = .array(configuration.tools.map {
                 .object(["name": .string($0.name), "description": .string($0.description), "parameters": $0.parameters])
             })
-            let conversationID = try await openRemote(binding, client: client, context: context, tools: tools)
+            let (conversationID, openedSeq) = try await openRemote(binding, client: client, context: context, tools: tools)
             let inbound = client.inbound(for: conversationID)
             client.setToolHandler({ [weak self] params in
                 await self?.callRemoteTool(params, tools: configuration.tools) ?? Self.remoteToolFailure("Ox conversation closed")
@@ -69,7 +76,8 @@ extension Conversation {
                         }
                     }
                     group.addTask { @MainActor in
-                        await self.consumeRemote(inbound, events: events, client: client, conversationID: conversationID)
+                        await self.consumeRemote(inbound, events: events, client: client, session: RemoteSession(
+                            conversationID: conversationID, context: context, tools: tools, seq: openedSeq ?? binding.lastSeq))
                     }
                     var outcome = ConversationRunResult(outcome: .aborted)
                     for await value in group {
@@ -106,14 +114,15 @@ extension Conversation {
         }
     }
 
-    private func openRemote(_ binding: RemoteAgentBinding, client: RemoteAgentClient, context: JSONValue, tools: JSONValue) async throws -> String {
+    private func openRemote(_ binding: RemoteAgentBinding, client: RemoteAgentClient, context: JSONValue, tools: JSONValue) async throws -> (String, Int?) {
         if let conversationID = binding.conversationID {
-            guard !client.isOpen(conversationID) else { return conversationID }
-            _ = try await client.call("conversations.open", .object(["id": .string(conversationID), "context": context, "tools": tools]))
+            guard !client.isOpen(conversationID) else { return (conversationID, nil) }
+            let opened = try await client.call("conversations.open", .object(["id": .string(conversationID), "context": context, "tools": tools]))
             client.markOpen(conversationID)
-            return conversationID
+            return (conversationID, opened.objectValue?["seq"]?.intValue)
         }
         var request: [String: JSONValue] = ["context": context, "tools": tools]
+        if let folder = binding.folder { request["cwd"] = .string(folder) }
         if let model = binding.model { request["model"] = .object(["provider": .string(model.provider), "id": .string(model.id)]) }
         if let thinkingLevel = binding.thinkingLevel { request["thinkingLevel"] = .string(thinkingLevel) }
         let created = try await client.call("conversations.new", .object(request)).objectValue ?? [:]
@@ -126,7 +135,7 @@ extension Conversation {
         }
         remoteAgent = next
         Log.session.info("Conversation.remote created id=\(id) conversation=\(conversationID)")
-        return conversationID
+        return (conversationID, 0)
     }
 
     private func remoteContext(configuration: AgentConfiguration, turnState: JSONValue?) async throws -> JSONValue {
@@ -163,13 +172,20 @@ extension Conversation {
     }
 
     private func consumeRemote(_ inbound: AsyncStream<RemoteAgentInbound>, events: RemoteAgentEvents,
-                               client: RemoteAgentClient, conversationID: String) async -> ConversationRunResult {
+                               client: RemoteAgentClient, session: RemoteSession) async -> ConversationRunResult {
+        let conversationID = session.conversationID
         var events = events
         var invocations: [String: UUID] = [:]
         var prompts: Set<String> = []
+        var lastSeq = session.seq
+        defer { if let lastSeq, remoteAgent?.conversationID == conversationID { remoteAgent?.lastSeq = lastSeq } }
         for await message in inbound {
             switch message {
-            case .event(let value):
+            case .event(let value, let seq):
+                if let seq {
+                    guard seq > (lastSeq ?? 0) else { continue }
+                    lastSeq = seq
+                }
                 let (agentEvents, progress) = events.receive(value)
                 for event in agentEvents {
                     presentRemoteTool(event, invocations: &invocations)
@@ -190,7 +206,14 @@ extension Conversation {
                     return ConversationRunResult(outcome: .failed(message: params.objectValue?["error"]?.stringValue ?? "The agent process exited", kind: .provider))
                 }
             case .disconnected(let reason):
-                return remoteFailure(RemoteAgentError.disconnected(reason))
+                guard !client.isConnected else { continue }
+                switch await reconnectRemote(client: client, session: session, since: lastSeq) {
+                case .resumed(let seq): lastSeq = seq
+                case .ended(let message):
+                    return ConversationRunResult(outcome: .failed(message: message, kind: .provider))
+                case .unreachable:
+                    return remoteFailure(RemoteAgentError.disconnected(reason))
+                }
             }
         }
         return ConversationRunResult(outcome: .aborted)
@@ -212,6 +235,36 @@ extension Conversation {
     }
 
     private var configurationToolNames: Set<String> { [ConversationTool.schema.name] }
+
+    private func reconnectRemote(client: RemoteAgentClient, session: RemoteSession, since: Int?) async -> RemoteReconnect {
+        let deadline = ContinuousClock.now + .seconds(600)
+        var delay: Duration = .seconds(1)
+        var attempt = 0
+        while ContinuousClock.now < deadline, !Task.isCancelled {
+            attempt += 1
+            do {
+                var request: [String: JSONValue] = ["id": .string(session.conversationID), "context": session.context, "tools": session.tools]
+                if let since { request["since"] = .int(since) }
+                let opened = try await client.call("conversations.open", .object(request), timeout: .seconds(15))
+                client.markOpen(session.conversationID)
+                let fields = opened.objectValue ?? [:]
+                let replay = fields["replay"]?.stringValue ?? "none"
+                let seq = fields["seq"]?.intValue ?? 0
+                let restarted = seq < (since ?? 0)
+                Log.session.info("Conversation.remote reconnected id=\(id) attempt=\(attempt) since=\(since ?? -1) seq=\(seq) replay=\(replay) restarted=\(restarted)")
+                guard replay == "gap" || restarted else { return .resumed(seq: since) }
+                if fields["state"]?.stringValue == "idle" || restarted {
+                    return .ended(String(localized: "The agent finished or restarted while Ox was away, so the end of this reply couldn't be shown. Send a message to continue."))
+                }
+                return .resumed(seq: seq)
+            } catch {
+                Log.session.info("Conversation.remote reconnect id=\(id) attempt=\(attempt) error=\(LogPrivacy.text(error.localizedDescription, limit: 200))")
+                try? await Task.sleep(for: delay)
+                delay = min(delay * 2, .seconds(15))
+            }
+        }
+        return .unreachable
+    }
 
     private func remoteFailure(_ error: Error) -> ConversationRunResult {
         let unreachable = switch error {
@@ -287,4 +340,17 @@ extension Conversation {
         do { _ = try await client.call("conversations.respond", .object(response)) }
         catch { Log.session.error("Conversation.remote respond failed id=\(id) error=\(error.localizedDescription)") }
     }
+}
+
+nonisolated enum RemoteReconnect: Sendable {
+    case resumed(seq: Int?)
+    case ended(String)
+    case unreachable
+}
+
+nonisolated struct RemoteSession: Sendable {
+    let conversationID: String
+    let context: JSONValue
+    let tools: JSONValue
+    let seq: Int?
 }

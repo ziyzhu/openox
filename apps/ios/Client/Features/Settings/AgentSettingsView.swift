@@ -10,7 +10,7 @@ struct AgentSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 SettingsSection(
-                    footer: "Ox runs conversations on this device by default. Add pi running on another computer with `ox agent serve`, such as ws://my-mac.tailnet.ts.net:9877. It keeps Ox's tools and context. Long-press an agent to remove it.",
+                    footer: "Ox runs conversations on this device by default. Add pi running on another computer with `ox agent serve`, using its Tailscale name such as my-mac.tailnet.ts.net. It keeps Ox's tools and context. Long-press an agent to remove it.",
                     layout: .group
                 ) {
                     VStack(spacing: 0) {
@@ -79,8 +79,8 @@ struct AgentSettingsView: View {
 
     private func subtitle(_ status: RemoteAgentStatus?) -> String {
         switch status {
-        case .online(let implementation, let version, let machine, let folder):
-            let place = [machine, URL(fileURLWithPath: folder).lastPathComponent].filter { !$0.isEmpty }.joined(separator: " · ")
+        case .online(let implementation, let version, let machine, let folders):
+            let place = [machine, folders.map { URL(fileURLWithPath: $0).lastPathComponent }.joined(separator: ", ")].filter { !$0.isEmpty }.joined(separator: " · ")
             return L10n.string("Reachable · \(implementation) \(version) · \(place)")
         case .offline: return L10n.string("Unavailable")
         case .checking, nil: return L10n.string("Checking…")
@@ -122,7 +122,7 @@ struct RemoteAgentCreationSheet: View {
             ScrollView {
                 VStack(spacing: SettingsLayout.sectionSpacing) {
                     SettingsSection(
-                        footer: "Run `ox agent serve` on the computer, then use its ws:// or wss:// address. ws:// uses port 9877 when none is given.",
+                        footer: "Run `ox agent serve` on the computer, then enter the address it prints, or just its Tailscale name. Tailscale names use wss:// and port 9878 by default.",
                         layout: .group
                     ) {
                         VStack(alignment: .leading, spacing: 0) {
@@ -130,7 +130,7 @@ struct RemoteAgentCreationSheet: View {
                                 .settingsRowPadding()
                                 .accessibilityIdentifier(A11yID.Settings.agentAddName)
                             Divider().settingsContentInset()
-                            TextField("ws://my-mac.tailnet.ts.net:9877", text: $address)
+                            TextField("my-mac.tailnet.ts.net", text: $address)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
                                 .keyboardType(.URL)

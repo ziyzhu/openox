@@ -88,8 +88,8 @@ struct AgentSelectionGroup: View {
 
     private func subtitle(_ agent: RemoteAgent) -> String {
         switch agents.statuses[agent.endpoint] {
-        case .online(_, _, let machine, let folder):
-            [machine, URL(fileURLWithPath: folder).lastPathComponent].filter { !$0.isEmpty }.joined(separator: " · ")
+        case .online(_, _, let machine, let folders):
+            [machine, folders.first.map { URL(fileURLWithPath: $0).lastPathComponent } ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
         case .offline: String(localized: "Offline")
         case .checking, nil: String(localized: "Checking…")
         }
@@ -136,6 +136,25 @@ struct RemoteAgentModelPicker<Header: View>: View {
                     .accessibilityIdentifier(A11yID.ConversationControls.agentModelMenu)
                 }
                 .settingsSurface()
+                if agents.folders(for: endpoint).count > 1 || conversation.remoteAgent?.folder != nil {
+                    VStack(spacing: 0) {
+                        Menu {
+                            ForEach(agents.folders(for: endpoint), id: \.self) { folder in
+                                Button { conversation.selectRemoteFolder(folder) } label: {
+                                    Label { Text(verbatim: URL(fileURLWithPath: folder).lastPathComponent); Text(verbatim: folder) } icon: {
+                                        if folder == selectedFolder { Image(systemName: "checkmark") }
+                                    }
+                                }
+                            }
+                        } label: {
+                            SettingsDisclosureRow(title: "Folder", value: Text(verbatim: selectedFolder.map { URL(fileURLWithPath: $0).lastPathComponent } ?? ""),
+                                                  indicator: conversation.canChangeAgent ? "chevron.up.chevron.down" : nil)
+                        }
+                        .disabled(!conversation.canChangeAgent)
+                        .accessibilityIdentifier(A11yID.ConversationControls.agentFolderMenu)
+                    }
+                    .settingsSurface()
+                }
                 if case .offline(let error) = agents.statuses[endpoint] {
                     SettingsErrorMessage(message: String(localized: "\(agents.displayName(for: endpoint)) is offline: \(error)"),
                                          systemImage: "exclamationmark.circle.fill")
@@ -152,6 +171,10 @@ struct RemoteAgentModelPicker<Header: View>: View {
                 SheetDismissToolbarButton(accessibilityIdentifier: A11yID.ConversationControls.modelClose, action: onClose)
             }
         }
+    }
+
+    private var selectedFolder: String? {
+        conversation.remoteAgent?.folder ?? agents.folders(for: endpoint).first
     }
 
     private var selected: AgentModelReference? {

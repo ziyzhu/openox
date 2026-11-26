@@ -77,7 +77,7 @@ extension ConversationManager {
         return ChildConversationSnapshot(id: meta.id, title: meta.displayTitle, state: .idle, updatedAt: meta.activityDate)
     }
 
-    func startChild(prompt: String, title: String?, services: [Service], requestedBy parent: Conversation) async throws -> Conversation {
+    func startChild(prompt: String, title: String?, services: [Service], agent: RemoteAgentBinding? = nil, requestedBy parent: Conversation) async throws -> Conversation {
         guard parent.parentID == nil else {
             throw OxFunctionError(code: "delegation_unavailable", message: "ox.conversation.start: a child conversation cannot start another conversation.", recovery: "Do the work in this conversation.")
         }
@@ -88,9 +88,10 @@ extension ConversationManager {
         let child = try await makeChildConversation(parentID: parent.id, in: parent.scope)
         if let title, !title.isEmpty { child.rename(to: title) }
         child.setAttachedServices(services)
+        child.remoteAgent = agent
         parent.addChild(child.id)
         child.enqueue(prompt)
-        Log.session.info("delegation.start parent=\(parent.id) child=\(child.id) services=\(services.count) running=\(running + 1)")
+        Log.session.info("delegation.start parent=\(parent.id) child=\(child.id) services=\(services.count) agent=\(agent?.endpoint.absoluteString ?? "local") running=\(running + 1)")
         return child
     }
 

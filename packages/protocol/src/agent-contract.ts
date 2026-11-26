@@ -1,7 +1,7 @@
 import { Type, type Static, type TSchema } from "typebox";
 
 export const AGENT_PROTOCOL_VERSION = 1;
-export const AGENT_DEFAULT_PORT = 9877;
+export const AGENT_DEFAULT_PORT = 9878;
 
 const S = Type.String;
 const B = Type.Boolean;
@@ -24,7 +24,8 @@ export const AgentSchemas = {
   AgentTool: object("AgentTool", { name: S(), description: S(), parameters: json() }),
   AgentDescription: object("AgentDescription", {
     implementation: Type.Object({ name: S(), version: S() }),
-    machine: S(), folder: S(), protocols: Type.Record(S(), A(I({ minimum: 1 }))), methods: A(S()),
+    machine: S(), folder: S(), folders: A(S(), { description: "Allowed workspace roots; new conversations may use any of them or a descendant." }),
+    protocols: Type.Record(S(), A(I({ minimum: 1 }))), methods: A(S()),
   }),
   AgentModel: object("AgentModel", {
     provider: S(), id: S(), name: S(), reasoning: B(), contextWindow: optional(I()), maxTokens: optional(I()),
@@ -38,14 +39,18 @@ export const AgentSchemas = {
   }),
   AgentConversationsResult: object("AgentConversationsResult", { conversations: A(R("AgentConversationRow")) }),
   AgentNewRequest: object("AgentNewRequest", {
-    model: nullable(R("AgentModelRef")), thinkingLevel: nullable(S()), context: R("AgentContext"), tools: A(R("AgentTool")),
+    cwd: nullable(S({ minLength: 1, maxLength: 4096 })), model: nullable(R("AgentModelRef")), thinkingLevel: nullable(S()), context: R("AgentContext"), tools: A(R("AgentTool")),
   }),
   AgentNewResult: object("AgentNewResult", { id: conversationId(), model: nullable(R("AgentModelRef")) }),
-  AgentOpenRequest: object("AgentOpenRequest", { id: conversationId(), context: R("AgentContext"), tools: A(R("AgentTool")) }),
+  AgentOpenRequest: object("AgentOpenRequest", {
+    id: conversationId(), context: R("AgentContext"), tools: A(R("AgentTool")),
+    since: optional(I({ minimum: 0, description: "Replay buffered conversations.event notifications with seq greater than this before live events." })),
+  }),
   AgentOpenResult: object("AgentOpenResult", {
     messages: A(json(), { description: "pi-ai messages as returned by pi's get_messages." }),
     state: Type.Union([Type.Literal("idle"), Type.Literal("running")]), model: nullable(R("AgentModelRef")),
-    thinkingLevel: nullable(S()), title: nullable(S()),
+    thinkingLevel: nullable(S()), title: nullable(S()), seq: I({ minimum: 0, description: "Latest event seq for this conversation." }),
+    replay: optional(Type.Union([Type.Literal("complete"), Type.Literal("gap")], { description: "Whether every event after since was still buffered." })),
   }),
   AgentConversationRequest: object("AgentConversationRequest", { id: conversationId() }),
   AgentSendRequest: object("AgentSendRequest", {
@@ -61,7 +66,7 @@ export const AgentSchemas = {
   AgentSetThinkingRequest: object("AgentSetThinkingRequest", { id: conversationId(), level: S() }),
   AgentRenameRequest: object("AgentRenameRequest", { id: conversationId(), title: S({ maxLength: 1024 }) }),
   AgentEventNotification: object("AgentEventNotification", {
-    id: conversationId(), event: json(),
+    id: conversationId(), seq: I({ minimum: 1 }), event: json(),
   }, { description: "One pi RPC session event (agent_start, agent_settled, turn_*, message_*, tool_execution_*, compaction_*, queue_update, ...), unchanged." }),
   AgentPromptNotification: object("AgentPromptNotification", {
     id: conversationId(), promptId: S(),

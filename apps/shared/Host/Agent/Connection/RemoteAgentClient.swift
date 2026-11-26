@@ -17,7 +17,7 @@ nonisolated enum RemoteAgentError: LocalizedError {
 }
 
 nonisolated enum RemoteAgentInbound: Sendable {
-    case event(JSONValue)
+    case event(JSONValue, seq: Int?)
     case prompt(JSONValue)
     case changed(JSONValue)
     case disconnected(String)
@@ -76,6 +76,8 @@ final class RemoteAgentClient {
 
     func isOpen(_ conversationID: String) -> Bool { opened.contains(conversationID) }
 
+    var isConnected: Bool { socket != nil }
+
     func markOpen(_ conversationID: String) { opened.insert(conversationID) }
 
     private func connectedSocket() -> URLSessionWebSocketTask {
@@ -129,7 +131,7 @@ final class RemoteAgentClient {
         guard let conversationID = params.objectValue?["id"]?.stringValue else { return }
         let inbound: RemoteAgentInbound
         switch method {
-        case "conversations.event": inbound = .event(params.objectValue?["event"] ?? .null)
+        case "conversations.event": inbound = .event(params.objectValue?["event"] ?? .null, seq: params.objectValue?["seq"]?.intValue)
         case "conversations.prompt": inbound = .prompt(params)
         case "conversations.changed":
             if params.objectValue?["state"]?.stringValue == "exited" { opened.remove(conversationID) }

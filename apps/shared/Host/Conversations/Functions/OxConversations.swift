@@ -41,6 +41,8 @@ nonisolated enum OxConversations {
                         "prompt": boundedString(maximum: 20_000, description: "Self-contained instructions for the child conversation."),
                         "title": boundedString(maximum: 50, description: "A concise title of at most 50 characters."),
                         "services": .object(["type": .string("array"), "items": string, "maxItems": .int(10)]),
+                        "agent": boundedString(maximum: 100, description: "Name of a remote agent from Settings → Agents. Omit to run on this device."),
+                        "folder": boundedString(maximum: 4096, description: "Workspace folder on the agent's computer; defaults to its first allowed folder."),
                     ], required: ["prompt"]),
                     "outputSchema": child,
                 ])),

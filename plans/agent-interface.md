@@ -267,5 +267,18 @@ Later, if wanted: let the built-in agent use a remote machine's pi providers (fo
 - Ox sections are sent to pi as `ox_<key>`: pi rejects a custom `preamble` section and would replace its own `rules` and `skills`.
 - Remote turns are recorded as `ox.native.turn` entries after each run, because the projection restores turns only from entries that carry model messages.
 - Step 1 (renaming the local agent's actions to pi names) was skipped: both connections already meet at `AgentEvent`, and the rename would only churn the durable bridge.
-- Open: push notifications (needs the relay and an APNs key), agent names in background phase titles, opening a terminal-started pi session as a Host conversation (listing works through `agents.conversations`), a `tools.cancel` notification, and README/onboarding/website copy.
+- Security: `ox agent serve` binds `127.0.0.1` and publishes `wss://<mac>.ts.net:9878` with a foreground `tailscale serve`; only the Tailscale user who owns the Mac, or local loopback callers without forwarding headers, are admitted. Raw tailnet binding was removed.
+- Folders: `--directory` is repeatable; `agent.describe.folders` feeds a Folder row in the agent sheet, and `conversations.new {cwd}` must stay inside the roots.
+- Children: `ox.conversation.start({ agent, folder })` runs a child conversation on a remote agent, so an Ox conversation (or a remote pi) can delegate to pi on another machine.
+- Catch-up: events carry `seq`; when the socket drops mid-run the Host retries for up to 10 minutes and reopens with `since`, replaying missed events. A gap on an idle conversation, or a serve restart, ends the run with a notice.
+- Keep-awake: serve holds `caffeinate -i -w <pid>` on macOS unless `--allow-sleep`.
+- Open: push notifications (needs the relay and an APNs key), agent names in background phase titles, opening or forking a terminal-started pi session as a Host conversation (listing works through `agents.conversations`), terminal presence, reading agent-side files from the Client, a `tools.cancel` notification, catch-up after the Host app is relaunched mid-run, and README/onboarding/website copy.
+
+## Retiring pi-manager
+
+pi-manager exposes pi to an Ox conversation as MCP tools; `ox agent serve` plus agent child conversations covers that with visible, steerable conversations. Remaining pi-manager features to port first: terminal presence and forking external sessions, `read_file`/`read_attachment`, the multi-machine dashboard, and the menu bar app.
+
+## tailcat
+
+tailcat (Tailscale's data plane without its control plane: a secret address plus `--allow` node keys, NAT traversal, no accounts) was evaluated as the transport. It does not simplify v1: the iPhone Client and Host would have to embed tailcat's Go networking stack to dial it, Ox already depends on Tailscale for Host access, and Tailscale Serve already gives a trusted TLS name and per-user identity with no app-side code. It becomes worth revisiting if Ox needs to work without a Tailscale account; then `ox agent serve` could run behind `tailcat serve` and the app would add a tailcat client library.
 
