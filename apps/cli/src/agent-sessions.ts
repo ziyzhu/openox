@@ -1,12 +1,14 @@
-import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { ORIGIN_ENTRY } from "./agent-pi-extension.ts";
 
-export type SessionSummary = { id: string; path: string; cwd: string; title: string; updatedAt: string };
+export type Origin = "ox" | "terminal";
+export type SessionSummary = { id: string; path: string; cwd: string; title: string; origin: Origin; updatedAt: string };
 
 const TITLE_LIMIT = 80;
 
-function expandHome(path: string): string {
+export function expandHome(path: string): string {
   return path === "~" || path.startsWith("~/") ? join(homedir(), path.slice(1)) : path;
 }
 
@@ -15,53 +17,35 @@ function piAgentDirectory(): string {
   return override ? resolve(expandHome(override)) : join(homedir(), ".pi", "agent");
 }
 
-async function configuredSessionDirectory(cwd: string): Promise<string | undefined> {
+async function configuredSessionDirectory(): Promise<string | undefined> {
   const override = process.env.PI_CODING_AGENT_SESSION_DIR;
   if (override) return resolve(expandHome(override));
   const settings = await readFile(join(piAgentDirectory(), "settings.json"), "utf8").then(JSON.parse, () => undefined);
   const value = settings && typeof settings === "object" ? (settings as Record<string, unknown>).sessionDir : undefined;
-  return typeof value === "string" && value ? resolve(cwd, expandHome(value)) : undefined;
+  return typeof value === "string" && value ? resolve(homedir(), expandHome(value)) : undefined;
 }
 
-function encodedDirectory(cwd: string): string {
-  return `--${cwd.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}`;
-}
-
-export function within(roots: readonly string[], path: string): boolean {
-  return roots.some((root) => {
-    const offset = relative(root, path);
-    return offset === "" || (!offset.startsWith("..") && !isAbsolute(offset));
-  });
-}
-
-async function sessionDirectories(roots: readonly string[]): Promise<string[]> {
-  const configured = await Promise.all(roots.map(configuredSessionDirectory));
-  if (configured.every((directory) => directory !== undefined)) return [...new Set(configured)];
+async function sessionDirectories(): Promise<string[]> {
+  const configured = await configuredSessionDirectory();
+  if (configured) return [configured];
   const parent = join(piAgentDirectory(), "sessions");
-  const prefixes = roots.map(encodedDirectory);
   const names = await readdir(parent).catch(() => [] as string[]);
-  return names.filter((name) => prefixes.some((prefix) => name.startsWith(prefix))).map((name) => join(parent, name));
+  return names.map((name) => join(parent, name));
 }
 
 type Cached = { mtimeMs: number; size: number; summary: SessionSummary | undefined };
 
 export class SessionIndex {
   private readonly cache = new Map<string, Cached>();
-  private readonly roots: () => readonly string[];
-
-  constructor(roots: () => readonly string[]) {
-    this.roots = roots;
-  }
 
   async list(): Promise<SessionSummary[]> {
-    const roots = this.roots();
-    const directories = await sessionDirectories(roots);
+    const directories = await sessionDirectories();
     const paths = (await Promise.all(directories.map(async (directory) => {
       const names = await readdir(directory).catch(() => [] as string[]);
       return names.filter((name) => name.endsWith(".jsonl")).map((name) => join(directory, name));
     }))).flat();
     const summaries = await Promise.all(paths.map((path) => this.summary(path)));
-    return summaries.filter((summary): summary is SessionSummary => summary !== undefined && within(roots, summary.cwd));
+    return summaries.filter((summary): summary is SessionSummary => summary !== undefined);
   }
 
   async find(id: string): Promise<SessionSummary | undefined> {
@@ -86,12 +70,14 @@ function parseSession(path: string, text: string, updatedAt: string): SessionSum
   if (header?.type !== "session" || typeof header.id !== "string" || typeof header.cwd !== "string") return undefined;
   let name: string | undefined;
   let firstPrompt: string | undefined;
+  let origin: Origin = "terminal";
   for (const line of lines.slice(1)) {
     const entry = parseLine(line);
     if (entry?.type === "session_info") name = typeof entry.name === "string" && entry.name ? entry.name : undefined;
+    else if (entry?.type === "custom" && entry.customType === ORIGIN_ENTRY) origin = "ox";
     else if (!firstPrompt && entry?.type === "message") firstPrompt = userText(entry.message);
   }
-  return { id: header.id, path, cwd: header.cwd, title: name ?? truncateTitle(firstPrompt ?? ""), updatedAt };
+  return { id: header.id, path, cwd: header.cwd, title: name ?? truncateTitle(firstPrompt ?? ""), origin, updatedAt };
 }
 
 function parseLine(line: string | undefined): Record<string, unknown> | undefined {
@@ -116,37 +102,4 @@ function userText(message: unknown): string | undefined {
 export function truncateTitle(text: string): string {
   const line = text.replace(/\s+/g, " ").trim();
   return line.length > TITLE_LIMIT ? `${line.slice(0, TITLE_LIMIT - 1)}…` : line;
-}
-
-export class OriginStore {
-  private ids = new Set<string>();
-  private saving: Promise<void> = Promise.resolve();
-  private readonly path: string;
-  private readonly directory: string;
-
-  constructor(directory: string) {
-    this.directory = directory;
-    this.path = join(directory, "conversations.json");
-  }
-
-  async load(): Promise<void> {
-    const stored = await readFile(this.path, "utf8").then(JSON.parse, () => undefined);
-    if (stored?.format === 1 && Array.isArray(stored.ox)) this.ids = new Set(stored.ox.filter((id: unknown) => typeof id === "string"));
-  }
-
-  has(id: string): boolean { return this.ids.has(id); }
-
-  add(id: string): Promise<void> {
-    if (this.ids.has(id)) return this.saving;
-    this.ids.add(id);
-    this.saving = this.saving.then(() => this.save(), () => this.save());
-    return this.saving;
-  }
-
-  private async save(): Promise<void> {
-    await mkdir(this.directory, { recursive: true });
-    const temporary = `${this.path}.${process.pid}.tmp`;
-    await writeFile(temporary, `${JSON.stringify({ format: 1, ox: [...this.ids] }, null, 2)}\n`);
-    await rename(temporary, this.path);
-  }
 }

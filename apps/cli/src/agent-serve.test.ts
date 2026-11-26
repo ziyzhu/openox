@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { Value } from "typebox/value";
 import { AgentMethods, AgentSchemas } from "@openox/protocol/agent";
@@ -14,8 +14,7 @@ const context = { sections: { ox_test: "Always end replies with the word PINEAPP
 const tools = [{ name: "execute", description: "Run JavaScript on the Ox Host.", parameters: { type: "object", properties: { source: { type: "string" } }, required: ["source"] } }];
 
 let root = "";
-let workspace = "";
-let second = "";
+let home = "";
 let server: AgentServer;
 let client: AgentClient;
 const notifications: { method: string; params: Record<string, unknown> }[] = [];
@@ -32,12 +31,11 @@ async function rejection(promise: Promise<unknown>): Promise<AgentRPCError> {
 
 beforeAll(async () => {
   root = await realpath(await mkdtemp(join(tmpdir(), "ox-agent-serve-")));
-  workspace = join(root, "workspace");
-  second = join(root, "second");
-  await Promise.all([mkdir(join(workspace, "nested"), { recursive: true }), mkdir(second), mkdir(join(root, "outside"))]);
+  home = await realpath(homedir());
+  await mkdir(join(root, "project", "nested"), { recursive: true });
   process.env.PI_CODING_AGENT_SESSION_DIR = join(root, "sessions");
   server = await AgentServer.start({
-    folders: [workspace, second], approval: "no-approve", executable: executable!, stateDirectory: join(root, "state"), port: 0,
+    approval: "no-approve", executable: executable!, stateDirectory: join(root, "state"), port: 0,
     eventLimits: { events: 4, bytes: 1024 * 1024 },
   });
   client = await AgentClient.connect(server.url);
@@ -55,8 +53,7 @@ test.skipIf(!executable)("serves pi conversations over JSON-RPC", async () => {
   const description = await client.request("agent.describe");
   expect(valid("AgentDescription", description)).toBe(true);
   expect(description.implementation).toMatchObject({ name: "pi" });
-  expect(description.folder).toBe(join(root, "state", "conversations"));
-  expect(description.folders).toEqual([workspace, second]);
+  expect(description.cwd).toBe(home);
   expect(description.methods).toEqual(Object.keys(AgentMethods));
 
   const models = await client.request<{ models: unknown[] }>("models.list", {}, timeout);
@@ -68,8 +65,8 @@ test.skipIf(!executable)("serves pi conversations over JSON-RPC", async () => {
 
   const listed = await client.request<{ conversations: { id: string; origin: string; cwd: string }[] }>("conversations.list");
   expect(valid("AgentConversationsResult", listed)).toBe(true);
-  expect(listed.conversations.find((row) => row.id === created.id)).toMatchObject({ origin: "ox", cwd: join(root, "state", "conversations", created.id) });
-  expect(created).toMatchObject({ cwd: join(root, "state", "conversations", created.id) });
+  expect(listed.conversations.find((row) => row.id === created.id)).toMatchObject({ origin: "ox", cwd: home });
+  expect(created).toMatchObject({ cwd: home });
 
   const opened = await client.request("conversations.open", { id: created.id, context, tools }, timeout);
   expect(valid("AgentOpenResult", opened)).toBe(true);
@@ -87,24 +84,18 @@ test.skipIf(!executable)("serves pi conversations over JSON-RPC", async () => {
   expect((await rejection(client.request("conversations.unknown"))).code).toBe(-32601);
 }, timeout * 3);
 
-test.skipIf(!executable)("creates conversations only inside the authorized folders", async () => {
-  const outside = await rejection(client.request("conversations.new", { cwd: join(root, "outside"), context, tools }));
-  expect(outside).toMatchObject({ code: -32602, message: "folder outside authorized folders" });
-  const escaped = await rejection(client.request("conversations.new", { cwd: "../outside", context, tools }));
-  expect(escaped.code).toBe(-32602);
-  const nested = await client.request<{ id: string }>("conversations.new", { cwd: join(workspace, "nested"), context, tools }, timeout);
+test.skipIf(!executable)("creates conversations in any existing folder", async () => {
+  const nested = await client.request<{ id: string; cwd: string }>("conversations.new", { cwd: join(root, "project", "nested"), context, tools }, timeout);
+  expect(nested.cwd).toBe(join(root, "project", "nested"));
   await client.request("conversations.rename", { id: nested.id, title: "Nested" });
   const listed = await client.request<{ conversations: { id: string; cwd: string }[] }>("conversations.list");
-  expect(listed.conversations.find((row) => row.id === nested.id)?.cwd).toBe(join(workspace, "nested"));
+  expect(listed.conversations.find((row) => row.id === nested.id)?.cwd).toBe(join(root, "project", "nested"));
 
-  expect(await client.request("folders.add", { path: join(root, "outside") })).toEqual({ folders: [workspace, second, join(root, "outside")] });
-  const added = await client.request<{ id: string }>("conversations.new", { cwd: join(root, "outside"), context, tools }, timeout);
-  expect((await rejection(client.request("folders.add", { path: join(root, "missing") }))).code).toBe(-32602);
-  expect(await client.request("folders.remove", { path: workspace })).toEqual({ folders: [second, join(root, "outside")] });
-  expect((await rejection(client.request("conversations.new", { cwd: join(workspace, "nested"), context, tools }))).code).toBe(-32602);
-  const remaining = await client.request<{ conversations: { id: string }[] }>("conversations.list");
-  expect(remaining.conversations.some((row) => row.id === added.id)).toBe(true);
-  expect(await client.request("folders.list")).toEqual({ folders: [second, join(root, "outside")] });
+  const tilde = await client.request<{ cwd: string }>("conversations.new", { cwd: "~", context, tools }, timeout);
+  expect(tilde.cwd).toBe(home);
+  const missing = await rejection(client.request("conversations.new", { cwd: join(root, "missing"), context, tools }));
+  expect(missing).toMatchObject({ code: -32602, message: "folder does not exist" });
+  expect((await rejection(client.request("folders.list"))).code).toBe(-32601);
 }, timeout * 2);
 
 test.skipIf(!executable)("replays buffered events after the open result", async () => {

@@ -26,8 +26,7 @@ export const AgentSchemas = {
   AgentDescription: object("AgentDescription", {
     implementation: Type.Object({ name: S(), version: S() }),
     machine: S(),
-    folder: S({ description: "Parent of the working folders the agent creates for conversations started without a cwd." }),
-    folders: A(S(), { description: "Authorized folders; a new conversation may use any of them or a descendant as its cwd." }),
+    cwd: S({ description: "The folder a conversation started without a cwd runs in." }),
     protocols: Type.Record(S(), A(I({ minimum: 1 }))), methods: A(S()),
   }),
   AgentModel: object("AgentModel", {
@@ -45,7 +44,7 @@ export const AgentSchemas = {
   }),
   AgentConversationsResult: object("AgentConversationsResult", { conversations: A(R("AgentConversationRow")) }),
   AgentNewRequest: object("AgentNewRequest", {
-    cwd: nullable(S({ minLength: 1, maxLength: 4096, description: "An authorized folder or a descendant; omitted, the conversation gets its own working folder." })), model: nullable(R("AgentModelRef")), thinkingLevel: nullable(S()), context: R("AgentContext"), tools: A(R("AgentTool")),
+    cwd: nullable(S({ minLength: 1, maxLength: 4096, description: "Any folder on the agent's machine; relative paths and ~ resolve against the agent's cwd." })), model: nullable(R("AgentModelRef")), thinkingLevel: nullable(S()), context: R("AgentContext"), tools: A(R("AgentTool")),
   }),
   AgentNewResult: object("AgentNewResult", {
     id: conversationId(), model: nullable(R("AgentModelRef")), cwd: optional(S({ description: "The conversation's working folder on the agent's machine." })),
@@ -60,8 +59,6 @@ export const AgentSchemas = {
     thinkingLevel: nullable(S()), title: nullable(S()), seq: I({ minimum: 0, description: "Latest event seq for this conversation." }),
     replay: optional(Type.Union([Type.Literal("complete"), Type.Literal("gap")], { description: "Whether every event after since was still buffered." })),
   }),
-  AgentFolderRequest: object("AgentFolderRequest", { path: S({ minLength: 1, maxLength: 4096 }) }, { description: "Accepted only from the agent's own machine (loopback); Hosts can read folders but not change them." }),
-  AgentFoldersResult: object("AgentFoldersResult", { folders: A(S()) }),
   AgentConversationRequest: object("AgentConversationRequest", { id: conversationId() }),
   AgentSendRequest: object("AgentSendRequest", {
     id: conversationId(), text: S(), images: optional(A(Type.Object({ data: S(), mimeType: S() }))),
@@ -121,9 +118,6 @@ export const AgentMethods = {
   "conversations.setThinking": method("AgentSetThinkingRequest", "AgentEmptyResult"),
   "conversations.compact": method("AgentConversationRequest", "AgentEmptyResult"),
   "conversations.rename": method("AgentRenameRequest", "AgentEmptyResult"),
-  "folders.list": method("AgentEmptyRequest", "AgentFoldersResult"),
-  "folders.add": method("AgentFolderRequest", "AgentFoldersResult"),
-  "folders.remove": method("AgentFolderRequest", "AgentFoldersResult"),
   "notifications.register": method("AgentPushRegistration", "AgentEmptyResult"),
   "notifications.unregister": method("AgentPushUnregistration", "AgentEmptyResult"),
 } as const;

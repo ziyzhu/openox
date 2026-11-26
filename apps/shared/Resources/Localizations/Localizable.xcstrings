@@ -86,17 +86,6 @@
         }
       }
     },
-    "A new folder for this conversation" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "为此对话新建的文件夹"
-          }
-        }
-      }
-    },
     "Add Remote Agent" : {
       "localizations" : {
         "zh-Hans" : {
@@ -409,17 +398,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开智能体和模型设置"
-          }
-        }
-      }
-    },
-    "Own folder" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "独立文件夹"
           }
         }
       }

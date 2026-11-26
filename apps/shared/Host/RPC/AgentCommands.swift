@@ -49,9 +49,9 @@ extension OxHostProtocol {
             AgentModelRow(provider: $0.reference.provider, id: $0.reference.id, name: $0.name, reasoning: $0.reasoning)
         }
         switch directory.statuses[agent.endpoint] {
-        case .online(let implementation, let version, let machine, let folders):
+        case .online(let implementation, let version, let machine, let cwd):
             return AgentRow(name: agent.name, endpoint: agent.endpoint.absoluteString, status: "online", implementation: implementation,
-                            version: version, machine: machine, folder: folders.first, error: nil, models: models)
+                            version: version, machine: machine, folder: cwd, error: nil, models: models)
         case .offline(let error):
             return AgentRow(name: agent.name, endpoint: agent.endpoint.absoluteString, status: "offline", implementation: nil,
                             version: nil, machine: nil, folder: nil, error: error, models: models)

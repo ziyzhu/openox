@@ -69,7 +69,7 @@ nonisolated struct RemoteAgentModel: Equatable, Hashable, Identifiable, Sendable
 
 nonisolated enum RemoteAgentStatus: Equatable, Sendable {
     case checking
-    case online(implementation: String, version: String, machine: String, folders: [String])
+    case online(implementation: String, version: String, machine: String, cwd: String?)
     case offline(String)
 
     var isOnline: Bool { if case .online = self { true } else { false } }
@@ -180,11 +180,11 @@ final class RemoteAgentDirectory {
                 "models": .int(models[agent.endpoint]?.count ?? 0),
             ]
             switch statuses[agent.endpoint] {
-            case .online(let implementation, let version, let machine, let folders):
+            case .online(let implementation, let version, let machine, let cwd):
                 fields["status"] = .string("online")
                 fields["agent"] = .string("\(implementation) \(version)")
                 fields["machine"] = .string(machine)
-                fields["folders"] = .array(folders.map(JSONValue.string))
+                if let cwd { fields["cwd"] = .string(cwd) }
             case .offline(let error):
                 fields["status"] = .string("offline")
                 fields["error"] = .string(String(error.prefix(200)))
@@ -219,13 +219,11 @@ final class RemoteAgentDirectory {
         do {
             let description = try await client.call("agent.describe", timeout: .seconds(5)).objectValue ?? [:]
             let implementation = description["implementation"]?.objectValue
-            let listed: [String]? = description["folders"]?.arrayValue?.compactMap(\.stringValue)
-            let folders: [String] = listed ?? description["folder"]?.stringValue.map { [$0] } ?? []
             statuses[endpoint] = .online(
                 implementation: implementation?["name"]?.stringValue ?? "agent",
                 version: implementation?["version"]?.stringValue ?? "",
                 machine: description["machine"]?.stringValue ?? endpoint.host() ?? "",
-                folders: folders
+                cwd: description["cwd"]?.stringValue
             )
             let listing = try await client.call("models.list", timeout: .seconds(30)).objectValue ?? [:]
             models[endpoint] = (listing["models"]?.arrayValue ?? []).compactMap(Self.model)
@@ -272,8 +270,8 @@ final class RemoteAgentDirectory {
         if case .online(_, _, let machine, _) = statuses[endpoint] { machine } else { nil }
     }
 
-    func folders(for endpoint: URL) -> [String] {
-        if case .online(_, _, _, let folders) = statuses[endpoint] { folders } else { [] }
+    func cwd(for endpoint: URL) -> String? {
+        if case .online(_, _, _, let cwd) = statuses[endpoint] { cwd } else { nil }
     }
 
     func agent(named name: String) -> RemoteAgent? {

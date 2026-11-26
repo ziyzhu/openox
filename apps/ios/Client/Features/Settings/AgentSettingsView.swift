@@ -121,9 +121,8 @@ struct AgentSettingsView: View {
 
     private func subtitle(_ status: RemoteAgentStatus?) -> String {
         switch status {
-        case .online(let implementation, let version, let machine, let folders):
-            let place = [machine, folders.map { URL(fileURLWithPath: $0).lastPathComponent }.joined(separator: ", ")].filter { !$0.isEmpty }.joined(separator: " · ")
-            return L10n.string("Reachable · \(implementation) \(version) · \(place)")
+        case .online(let implementation, let version, let machine, _):
+            return L10n.string("Reachable · \(implementation) \(version) · \(machine)")
         case .offline: return L10n.string("Unavailable")
         case .checking, nil: return L10n.string("Checking…")
         }

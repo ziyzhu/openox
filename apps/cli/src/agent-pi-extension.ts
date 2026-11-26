@@ -2,10 +2,13 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 export const BRIDGE_ENVIRONMENT = "OX_AGENT_BRIDGE";
+export const ORIGIN_ENVIRONMENT = "OX_AGENT_ORIGIN";
+export const ORIGIN_ENTRY = "ox.origin";
 export const HOST_UNAVAILABLE = "Ox Host is unavailable";
 
 const SOURCE = String.raw`
 const bridge = process.env.OX_AGENT_BRIDGE;
+const origin = process.env.OX_AGENT_ORIGIN;
 const unavailable = "Ox Host is unavailable";
 
 export default async function oxExtension(pi) {
@@ -35,6 +38,8 @@ export default async function oxExtension(pi) {
   }
 
   await sync();
+
+  if (origin) pi.on("session_start", () => pi.appendEntry(${JSON.stringify(ORIGIN_ENTRY)}, { origin }));
 
   pi.on("before_agent_start", async (event) => {
     const { sections } = await sync();

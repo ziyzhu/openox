@@ -186,7 +186,7 @@ nonisolated enum A11yID {
         static let agentAdd = "conversation.agentAdd"
         static func agentOption(_ name: String) -> String { "conversation.agentOption.\(name)" }
         static let agentModelMenu = "conversation.agentModelMenu"
-        static let agentFolderMenu = "conversation.agentFolderMenu"
+        static let agentFolder = "conversation.agentFolder"
         static let modelSetup = "conversation.modelSetup"
         static let modelAccessNotice = "conversation.modelAccessNotice"
         static let modelRegion = "conversation.modelRegion"

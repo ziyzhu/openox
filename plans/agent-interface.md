@@ -81,9 +81,9 @@ notify tools.progress        {id, toolCallId, message}
 ## ox agent serve
 
 ```text
-ox agent serve [--port 9877] [--cwd <folder>] [--approve | --no-approve]
+ox agent serve [--port 9877] [--approve | --no-approve]
   per open conversation: pi --mode rpc --session <id> -e <ox pi extension>
-  conversations.list: pi session files for the folder (~/.pi/agent/sessions)
+  conversations.list: every pi session file (~/.pi/agent/sessions)
   conversations.* ↔ pi RPC commands: prompt, steer, follow_up, abort, get_messages, set_model,
                     set_thinking_level, compact, set_session_name, fork; extension UI ↔ prompts
 ```
@@ -128,7 +128,7 @@ Client → Profile (on a device) → Agent. Host is no longer a concept: what it
   Profile  memory, skills, conversations, files, policy, services, providers, remote agents;
            device-bound values (secrets, website logins, folder grants) scoped to it but stored on the device
   device   the app's runtime for the active Profile (VM, web views), ingress, push, "allow connections"
-  Agent    the loop and its machine's folders and macOS permissions
+  Agent    the loop and its machine's limits: tools, macOS permissions
 ```
 
 A device serves one active Profile at a time, so a remote Client opens that Profile or asks before switching it. A Profile synced to several devices has one writer at a time.
@@ -136,8 +136,7 @@ A device serves one active Profile at a time, so a remote Client opens that Prof
 Agent machine limits:
 
 ```diff
-  folders.json          set by `ox agent serve --directory` and `ox agent folders` on that machine
-+ folders.add/remove    accepted over loopback only; Hosts read folders, never change them
+  folders               none; pi runs as the Mac's user, and a conversation starts in its home folder or a cwd the Host names
 + conversations.new     result + cwd; the Host stores it on RemoteAgentBinding
   tools                 pi's own defaults; no agent-side tool permissions for now
 ```
@@ -165,7 +164,7 @@ Website data moves between Profiles and devices with `WKWebsiteDataStore.fetchDa
 
 Order:
 
-1. Done: folders writable only over loopback; `cwd` in `conversations.new`.
+1. Done: `cwd` in `conversations.new`; authorized folders removed.
 2. Dropped for now: agent-side tool permissions.
 3. Done: per-Profile secrets (prefixed Keychain accounts) and website logins (store per Profile), migrated to the Profile selected at upgrade.
 4. Website data export and import with `fetchData`/`restoreData`, after a device check of what restores.
@@ -320,7 +319,8 @@ Later, if wanted: let the built-in agent use a remote machine's pi providers (fo
 - Remote turns are recorded as `ox.native.turn` entries after each run, because the projection restores turns only from entries that carry model messages.
 - Step 1 (renaming the local agent's actions to pi names) was skipped: both connections already meet at `AgentEvent`, and the rename would only churn the durable bridge.
 - Security: `ox agent serve` binds `127.0.0.1` and publishes `wss://<mac>.ts.net:9878` with a foreground `tailscale serve`; only the Tailscale user who owns the Mac, or local loopback callers without forwarding headers, are admitted. Raw tailnet binding was removed.
-- Folders: the agent keeps authorized folders in `folders.json`, set by `--directory` and changed with `folders.add`/`folders.remove` (`ox agent folders`); a conversation without `cwd` runs in `conversations/<id>/` under the agent's state directory; the agent tells pi its working folder and authorized folders each turn; the agent sheet offers Own folder or an authorized folder.
+- Folders: no authorized folders; `agent.describe` reports `cwd`, the user's home folder, where a conversation without `cwd` runs; any existing folder is accepted as `cwd`; the agent tells pi its working folder each turn; the agent sheet shows the folder read-only.
+- Storage: pi's session files are the only record of conversations; the agent lists every one, and a conversation it starts carries an `ox.origin` custom entry so `origin` survives restarts.
 - Children: `ox.conversation.start({ agent, folder })` runs a child conversation on a remote agent, so an Ox conversation (or a remote pi) can delegate to pi on another machine.
 - Catch-up: events carry `seq`; when the socket drops mid-run the Host retries for up to 10 minutes and reopens with `since`, replaying missed events. A gap on an idle conversation, or a serve restart, ends the run with a notice.
 - Keep-awake: serve holds `caffeinate -i -w <pid>` on macOS unless `--allow-sleep`.

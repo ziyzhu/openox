@@ -29,13 +29,6 @@ extension Conversation {
         updateRemoteSelection(model: model, thinking: nil)
     }
 
-    func selectRemoteFolder(_ folder: String?) {
-        guard canChangeAgent, var binding = remoteAgent, binding.conversationID == nil else { return }
-        binding.folder = folder
-        remoteAgent = binding
-        Log.session.info("Conversation.agent folder id=\(id) own=\(folder == nil) chars=\(folder?.count ?? 0)")
-    }
-
     func selectRemoteThinking(_ level: String) {
         updateRemoteSelection(model: nil, thinking: level)
     }
