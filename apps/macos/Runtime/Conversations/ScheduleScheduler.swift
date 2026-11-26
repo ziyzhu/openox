@@ -5,7 +5,7 @@ import Foundation
 final class ScheduleScheduler {
     static let shared = ScheduleScheduler()
 
-    private weak var runtime: SharedProfileRuntime?
+    private weak var runtime: MacProfileRuntime?
     private var timer: Task<Void, Never>?
     private var work: Task<Void, Never>?
     private var wakeObserver: NSObjectProtocol?
@@ -14,7 +14,7 @@ final class ScheduleScheduler {
 
     private init() {}
 
-    func configure(runtime: SharedProfileRuntime) {
+    func configure(runtime: MacProfileRuntime) {
         self.runtime = runtime
     }
 

@@ -2,12 +2,12 @@ import AppKit
 
 @MainActor
 final class MacMenu: NSObject, NSMenuDelegate {
-    private let runtime: SharedProfileRuntime
+    private let runtime: MacProfileRuntime
     private let access: ConnectionAccess
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let windows = MacServiceWindows()
 
-    init(runtime: SharedProfileRuntime, access: ConnectionAccess) {
+    init(runtime: MacProfileRuntime, access: ConnectionAccess) {
         self.runtime = runtime
         self.access = access
         super.init()

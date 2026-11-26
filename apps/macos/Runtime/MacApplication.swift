@@ -17,7 +17,7 @@ struct MacMain {
 
 @MainActor
 final class MacApplication: NSObject, NSApplicationDelegate {
-    private var runtime: SharedProfileRuntime?
+    private var runtime: MacProfileRuntime?
     private var transport: ProfileServer?
     private var menu: MacMenu?
     private var startup: Task<Void, Never>?
@@ -25,16 +25,7 @@ final class MacApplication: NSObject, NSApplicationDelegate {
     private var signals: [DispatchSourceSignal] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        StorageMigrator.migrateApp()
-        let runtime = SharedProfileRuntime(
-            serviceManager: ServiceManager(nativeServices: MacNativeServiceCatalog()),
-            presentations: MacAppPresentations().presentations,
-            conversationExecution: MacConversationExecution(),
-            conversationFeedback: MacConversationFeedback(),
-            executionPolicy: { true },
-            activateSchedules: { try await ScheduleScheduler.shared.activate() },
-            deactivateSchedules: { await ScheduleScheduler.shared.stop() }
-        )
+        let runtime = MacProfileRuntime()
         ScheduleScheduler.shared.configure(runtime: runtime)
         let access = ConnectionAccess()
         let transport = ProfileServer(runtime: runtime, access: access)
