@@ -21,6 +21,7 @@ targets:
         script: sh "$SRCROOT/../shared/validate-agent-bundle.sh"
         basedOnDependencyAnalysis: false
     sources:
+      - path: Client
       - path: Runtime
       - path: Resources
       - path: Diagnostics
