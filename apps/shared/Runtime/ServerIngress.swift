@@ -3,12 +3,12 @@ import Network
 
 nonisolated enum ServerIngress: Equatable, Sendable {
     case tailscale(TailscaleIngress)
-    #if DEBUG
+    #if OX_DEBUG_LOOPBACK
     case loopback
     #endif
 
     static var loopbackEnabled: Bool {
-        #if DEBUG
+        #if OX_DEBUG_LOOPBACK
         ProcessInfo.processInfo.environment["OX_PROFILE_LOOPBACK"] == "1"
         #else
         false
@@ -20,7 +20,7 @@ nonisolated enum ServerIngress: Equatable, Sendable {
     }
 
     static func current(on path: NWPath) -> Self? {
-        #if DEBUG
+        #if OX_DEBUG_LOOPBACK
         if loopbackEnabled { return .loopback }
         #endif
         return TailscaleIngress.current(on: path).map(Self.tailscale)
@@ -29,7 +29,7 @@ nonisolated enum ServerIngress: Equatable, Sendable {
     var description: String {
         switch self {
         case .tailscale(let ingress): "tailscale interface=\(ingress.interface.name)"
-        #if DEBUG
+        #if OX_DEBUG_LOOPBACK
         case .loopback: "debug-loopback"
         #endif
         }
@@ -38,7 +38,7 @@ nonisolated enum ServerIngress: Equatable, Sendable {
     var addresses: [String] {
         switch self {
         case .tailscale(let ingress): ingress.addresses
-        #if DEBUG
+        #if OX_DEBUG_LOOPBACK
         case .loopback: ["127.0.0.1"]
         #endif
         }
@@ -47,7 +47,7 @@ nonisolated enum ServerIngress: Equatable, Sendable {
     func constrain(_ parameters: NWParameters) {
         switch self {
         case .tailscale(let ingress): parameters.requiredInterface = ingress.interface
-        #if DEBUG
+        #if OX_DEBUG_LOOPBACK
         case .loopback: parameters.requiredInterfaceType = .loopback
         #endif
         }
@@ -57,7 +57,7 @@ nonisolated enum ServerIngress: Equatable, Sendable {
         switch self {
         case .tailscale(let ingress):
             ingress.accepts(path, address: address, port: port)
-        #if DEBUG
+        #if OX_DEBUG_LOOPBACK
         case .loopback:
             if let path, path.status == .satisfied, path.usesInterfaceType(.loopback), address == "127.0.0.1",
                case let .hostPort(localHost, localPort) = path.localEndpoint,

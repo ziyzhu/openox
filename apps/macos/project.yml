@@ -70,3 +70,6 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: mac.entitlements
         ENABLE_HARDENED_RUNTIME: YES
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG OX_DEBUG_LOOPBACK $(inherited)

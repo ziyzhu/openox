@@ -1,6 +1,11 @@
 import Foundation
 
 enum ProfileProtocol {
+    static let automationMethods: Set<Method> = [
+        .getComposerFormatting, .setComposerDraft, .setComposerMarkedText, .setPasteboardImage,
+        .setPasteboardRichText, .stageSharedNote, .setEditDraft,
+    ]
+
     @MainActor
     static func handle(
         _ data: Data, runtime: any ProfileRuntime,
@@ -50,7 +55,7 @@ enum ProfileProtocol {
             try handleDurableExperiment(method, params: params, conversations: conversations, reply: reply)
         case .describe:
             _ = try decode(EmptyRequest.self)
-            reply.success(ProfileRPC.description)
+            reply.success(ProfileRPC.description(for: runtime))
         case .invokeAction: handleInvokeAction(try decode(ActionRequest.self), conversationManager: conversations, serviceManager: services, reply: reply)
         case .evaluate: handleEvaluate(try decode(EvaluateRequest.self), serviceManager: services, reply: reply)
         case .reloadService: handleReloadService(try decode(ServiceRequest.self), serviceManager: services, reply: reply)
@@ -70,7 +75,6 @@ enum ProfileProtocol {
         case .removeAgent: handleRemoveAgent(try decode(AgentEndpointRequest.self), reply: reply)
         case .listAgentConversations: handleListAgentConversations(try decode(AgentEndpointRequest.self), conversationManager: conversations, reply: reply)
         case .getLogs: handleGetLogs(try decode(GetLogsRequest.self), reply: reply)
-        case .getComposerFormatting: ClientAutomation.handleGetComposerFormatting(try decode(EmptyRequest.self), reply: reply)
         case .repositoryGate: handleRepositorySaveGate(try decode(RepositoryGateRequest.self), conversationManager: conversations, reply: reply)
         case .vmInspect:
             let request = try decode(VMRequest.self)
@@ -85,12 +89,12 @@ enum ProfileProtocol {
         case .setKey: handleSetKey(try decode(SetKeyRequest.self), reply: reply)
         case .setRegion: handleSetRegion(try decode(SetRegionRequest.self), reply: reply)
         case .setAttachedService: handleSetAttachedService(try decode(SetAttachedServiceRequest.self), conversationManager: conversations, serviceManager: services, reply: reply)
-        case .setComposerDraft: ClientAutomation.handleSetComposerDraft(try decode(PromptRequest.self), reply: reply)
-        case .setComposerMarkedText: ClientAutomation.handleSetComposerMarkedText(try decode(PromptRequest.self), reply: reply)
-        case .setPasteboardImage: ClientAutomation.handleSetPasteboardImage(try decode(EmptyRequest.self), reply: reply)
-        case .setPasteboardRichText: ClientAutomation.handleSetPasteboardRichText(try decode(PromptRequest.self), reply: reply)
-        case .stageSharedNote: ClientAutomation.handleStageSharedNote(try decode(PromptRequest.self), reply: reply)
-        case .setEditDraft: ClientAutomation.handleSetEditDraft(try decode(PromptRequest.self), reply: reply)
+        case .getComposerFormatting, .setComposerDraft, .setComposerMarkedText, .setPasteboardImage, .setPasteboardRichText, .stageSharedNote, .setEditDraft:
+            guard let automation = runtime.automation else {
+                reply.failure("Ox on this device has no client UI", code: -32601)
+                return
+            }
+            try automation.perform(method, params: params, reply: reply)
         }
     }
 

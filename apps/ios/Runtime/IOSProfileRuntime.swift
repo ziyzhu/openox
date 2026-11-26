@@ -13,6 +13,7 @@ final class IOSProfileRuntime: ProfileRuntime {
     var conversations: ConversationManager { runtime.conversations }
     var state: RuntimeState { runtime.state }
     var executionAvailable: Bool { runtime.executionAvailable }
+    var automation: (any RuntimeAutomation.Type)? { ClientAutomation.self }
 
     convenience init() {
         StorageMigrator.migrateApp()

@@ -2,7 +2,7 @@ import Foundation
 
 @MainActor
 enum ProfileRPC {
-    static var description: JSONValue {
+    static func description(for runtime: any ProfileRuntime) -> JSONValue {
         .object([
             "implementation": .object([
                 "name": .string("Ox"),
@@ -15,12 +15,12 @@ enum ProfileRPC {
                 "rpc": versions([ProfileProtocol.contractVersion]),
                 "repository": versions(RuntimeProtocols.repository),
             ]),
-            "methods": .array(methods.map { .string($0.rawValue) }),
+            "methods": .array(methods(for: runtime).map { .string($0.rawValue) }),
         ])
     }
 
-    private static var methods: [ProfileProtocol.Method] {
-        ProfileProtocol.Method.allCases
+    private static func methods(for runtime: any ProfileRuntime) -> [ProfileProtocol.Method] {
+        ProfileProtocol.Method.allCases.filter { runtime.automation != nil || !ProfileProtocol.automationMethods.contains($0) }
     }
 
     private static func versions(_ values: [Int]) -> JSONValue { .array(values.map { .int($0) }) }

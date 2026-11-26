@@ -79,13 +79,13 @@ export async function check(): Promise<string> {
     failures.push("apps/ios/Client/App/App.swift: composition root must connect in-process and WebSocket transports to one runtime");
   }
 
-  const hostProtocol = await readFile(join(ROOT, "apps/ios/Runtime/ProfileProtocol.swift"), "utf8");
+  const hostProtocol = await readFile(join(ROOT, "apps/shared/Runtime/RPC/ProfileProtocol.swift"), "utf8");
   if (!hostProtocol.includes("runtime: any ProfileRuntime")) {
-    failures.push("apps/ios/Runtime/ProfileProtocol.swift: Profile protocol must target the ProfileRuntime contract");
+    failures.push("apps/shared/Runtime/RPC/ProfileProtocol.swift: Profile protocol must target the ProfileRuntime contract");
   }
   for (const forbidden of ["viewportController", "ConversationComposerModel", "var setEditDraft"]) {
     if (hostProtocol.includes(forbidden)) {
-      failures.push(`apps/ios/Runtime/ProfileProtocol.swift: UI automation state must remain in ClientAutomation (${forbidden})`);
+      failures.push(`apps/shared/Runtime/RPC/ProfileProtocol.swift: UI automation state must remain in ClientAutomation (${forbidden})`);
     }
   }
 
@@ -98,8 +98,8 @@ export async function check(): Promise<string> {
   }
   for (const path of [
     "apps/shared/Runtime/ProfileServer.swift",
-    "apps/ios/Runtime/ProfileRPC.swift",
-    "apps/ios/Runtime/ProfileProtocol.swift",
+    "apps/shared/Runtime/RPC/ProfileRPC.swift",
+    "apps/shared/Runtime/RPC/ProfileProtocol.swift",
     "apps/shared/Runtime/ProfileProtocolMessages.swift",
     "apps/shared/Runtime/RPC/ProfileRPCRequests.swift",
     "apps/shared/Runtime/Storage/StorageRoot.swift",
@@ -119,13 +119,17 @@ export async function check(): Promise<string> {
   if (/\.loopback\b/.test(webSocketTransport) || webSocketTransport.includes("NWListener(using: parameters, on:")) {
     failures.push("WebSocket transport must not select loopback directly or expose an unrestricted listener");
   }
-  const transportIngress = await readFile(join(ROOT, "apps/ios/Runtime/ServerIngress.swift"), "utf8");
-  for (const required of ["#if DEBUG && targetEnvironment(simulator)", 'environment["OX_PROFILE_LOOPBACK"] == "1"', "parameters.requiredInterface = ingress.interface", "parameters.requiredInterfaceType = .loopback", "TailscaleIngress.current(on:", 'address == "127.0.0.1"', "remoteHost == NWEndpoint.Host(address)"]) {
+  const transportIngress = await readFile(join(ROOT, "apps/shared/Runtime/ServerIngress.swift"), "utf8");
+  for (const required of ["#if OX_DEBUG_LOOPBACK", 'environment["OX_PROFILE_LOOPBACK"] == "1"', "parameters.requiredInterface = ingress.interface", "parameters.requiredInterfaceType = .loopback", "TailscaleIngress.current(on:", 'address == "127.0.0.1"', "remoteHost == NWEndpoint.Host(address)"]) {
     if (!transportIngress.includes(required)) failures.push(`Server ingress must constrain its opt-in Debug loopback (${required})`);
   }
-  const productionIngress = transportIngress.replace(/#if DEBUG && targetEnvironment\(simulator\)[\s\S]*?#endif/g, "");
+  const productionIngress = transportIngress.replace(/#if OX_DEBUG_LOOPBACK[\s\S]*?#endif/g, "");
   if ([".loopback", '"127.0.0.1"', '"OX_PROFILE_LOOPBACK"'].some(value => productionIngress.includes(value))) {
     failures.push("Debug loopback must be compiled out of Release and physical-device builds");
+  }
+  const iosProject = await readFile(join(ROOT, "apps/ios/project.yml"), "utf8");
+  if (iosProject.split("\n").some(line => line.includes("OX_DEBUG_LOOPBACK") && !line.includes("[sdk=iphonesimulator*]"))) {
+    failures.push("apps/ios/project.yml: OX_DEBUG_LOOPBACK must be limited to Debug Simulator builds");
   }
   if (app.includes("ProfileServer.configuredPort != nil")) {
     failures.push("Foreground connections must not require launch configuration");

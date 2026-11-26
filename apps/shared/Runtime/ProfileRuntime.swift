@@ -11,7 +11,13 @@ nonisolated struct ConversationSummary: Sendable {
 }
 
 @MainActor
+protocol RuntimeAutomation {
+    static func perform(_ method: ProfileProtocol.Method, params: JSONValue, reply: ProfileRPC.Reply) throws
+}
+
+@MainActor
 protocol ProfileRuntime: AnyObject {
+    var automation: (any RuntimeAutomation.Type)? { get }
     var state: RuntimeState { get }
     var executionAvailable: Bool { get }
     var conversations: ConversationManager { get }

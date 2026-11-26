@@ -8,6 +8,7 @@ final class MacProfileRuntime: ProfileRuntime {
     var conversations: ConversationManager { runtime.conversations }
     var state: RuntimeState { runtime.state }
     var executionAvailable: Bool { runtime.executionAvailable }
+    var automation: (any RuntimeAutomation.Type)? { nil }
 
     init() {
         StorageMigrator.migrateApp()

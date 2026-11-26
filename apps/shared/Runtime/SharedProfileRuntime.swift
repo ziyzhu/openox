@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-final class SharedProfileRuntime: ProfileRuntime {
+final class SharedProfileRuntime {
     private struct Preparation {
         let id: UUID
         let storage: Task<Void, Error>
