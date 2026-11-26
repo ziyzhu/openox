@@ -7,7 +7,6 @@ struct SettingsSheet: View {
 
     @AppStorage(Theme.Appearance.storageKey) private var appearance = Theme.Appearance.system
     @Environment(\.dismiss) private var dismiss
-    @Environment(ServiceManager.self) private var serviceManager
     @State private var profilePath: [UUID]
     @State private var pendingSkillDraft: SkillDraft?
     @State private var showOnboarding = false
@@ -17,6 +16,7 @@ struct SettingsSheet: View {
     @AppStorage(SpeechLanguage.storageKey) private var speechLanguage = ""
     @State private var locatingProfileID: UUID?
     @State private var profileOpenErrorMessage: String?
+    @State private var profileAgentNames: [UUID: String?] = [:]
     private let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
     private let appBuild = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
     private var appLocale: AppLocale { AppLocale.shared }
@@ -119,10 +119,6 @@ struct SettingsSheet: View {
                             .accessibilityIdentifier(A11yID.Settings.profileAdd)
                         }
                     }
-
-                    DefaultAgentSettingsSection()
-
-                    capabilitiesSettingsSection
 
                     SettingsSection(layout: .group) {
                         VStack(spacing: 0) {
@@ -271,7 +267,9 @@ struct SettingsSheet: View {
             .navigationDestination(for: UUID.self) { profileID in
                 ProfileSettingsView(
                     profileID: profileID,
-                    initialSkillDraft: pendingSkillDraft
+                    initialSkillDraft: pendingSkillDraft,
+                    ready: ready,
+                    onSelectService: onSelectService
                 )
             }
         }
@@ -293,6 +291,11 @@ struct SettingsSheet: View {
         .task(id: profilePath.isEmpty) {
             guard profilePath.isEmpty else { return }
             await storage.refreshAvailability()
+            var names: [UUID: String?] = [:]
+            for profile in storage.profiles {
+                names[profile.id] = await RemoteAgentConfiguration.defaultAgentName(in: ProfileScope(profileID: profile.id, root: profile.url, location: profile.location))
+            }
+            profileAgentNames = names
         }
         .fileImporter(
             isPresented: $openingProfile,
@@ -320,7 +323,91 @@ struct SettingsSheet: View {
         .errorAlert("Open Profile", message: $profileOpenErrorMessage)
     }
 
-    private var capabilitiesSettingsSection: some View {
+    private func profileActionRow(_ title: LocalizedStringKey, systemImage: String) -> some View {
+        HStack(spacing: Theme.Spacing.md) {
+            Image(systemName: systemImage)
+                .font(.system(.body, weight: .medium))
+                .foregroundStyle(Theme.Colors.primary)
+                .frame(width: 24)
+            Text(title)
+                .font(Theme.Fonts.bodyMd)
+                .foregroundStyle(Theme.Colors.onSurface)
+            Spacer(minLength: 0)
+        }
+        .settingsRowPadding()
+        .contentShape(Rectangle())
+    }
+
+    private func profileRow(_ profile: Profile) -> some View {
+        HStack(spacing: Theme.Spacing.md) {
+            Image(systemName: profileIcon(profile.location))
+                .font(.system(.body, weight: .medium))
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(verbatim: profile.name)
+                    .font(Theme.Fonts.bodyMd)
+                    .foregroundStyle(Theme.Colors.onSurface)
+                Text(verbatim: "\(profileLocation(profile.location)) · \(agentName(profile))")
+                    .font(Theme.Fonts.caption)
+                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
+            }
+            Spacer(minLength: 0)
+            if profile.id == storage.activeId {
+                Image(systemName: "checkmark")
+                    .font(.system(.subheadline, weight: .semibold))
+                    .foregroundStyle(Theme.Colors.primary)
+            }
+            Image(systemName: "chevron.right")
+                .font(Theme.Icons.xs)
+                .foregroundStyle(Theme.Colors.onSurfaceMuted)
+        }
+        .settingsRowPadding()
+        .contentShape(Rectangle())
+    }
+
+    private func profileIcon(_ location: Profile.Location) -> String {
+        switch location {
+        case .local: "iphone"
+        case .iCloud: "icloud"
+        case .external: "folder"
+        }
+    }
+
+    private func profileLocation(_ location: Profile.Location) -> String {
+        switch location {
+        case .local: L10n.string("On this device")
+        case .iCloud: L10n.string("In iCloud")
+        case .external: L10n.string("Opened from Files")
+        }
+    }
+
+    private func agentName(_ profile: Profile) -> String {
+        let directory = RemoteAgentDirectory.shared
+        let name = profile.id == storage.activeId
+            ? directory.defaultEndpoint.map(directory.displayName(for:))
+            : profileAgentNames[profile.id] ?? nil
+        return name ?? L10n.string("Current Device")
+    }
+
+}
+
+struct SheetCloseButton: ToolbarContent {
+    let action: () -> Void
+
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            SheetDismissToolbarButton(accessibilityIdentifier: A11yID.Settings.close, action: action)
+        }
+    }
+}
+
+struct ProfileCapabilitiesSection: View {
+    let ready: Bool
+    let onSelectService: (Service) -> Void
+    @Environment(ServiceManager.self) private var serviceManager
+
+    var body: some View {
         SettingsSection(layout: .group) {
             VStack(spacing: 0) {
                 NavigationLink {
@@ -376,76 +463,6 @@ struct SettingsSheet: View {
                 }
                 .buttonStyle(.plain)
             }
-        }
-    }
-
-    private func profileActionRow(_ title: LocalizedStringKey, systemImage: String) -> some View {
-        HStack(spacing: Theme.Spacing.md) {
-            Image(systemName: systemImage)
-                .font(.system(.body, weight: .medium))
-                .foregroundStyle(Theme.Colors.primary)
-                .frame(width: 24)
-            Text(title)
-                .font(Theme.Fonts.bodyMd)
-                .foregroundStyle(Theme.Colors.onSurface)
-            Spacer(minLength: 0)
-        }
-        .settingsRowPadding()
-        .contentShape(Rectangle())
-    }
-
-    private func profileRow(_ profile: Profile) -> some View {
-        HStack(spacing: Theme.Spacing.md) {
-            Image(systemName: profileIcon(profile.location))
-                .font(.system(.body, weight: .medium))
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(verbatim: profile.name)
-                    .font(Theme.Fonts.bodyMd)
-                    .foregroundStyle(Theme.Colors.onSurface)
-                Text(profileLocation(profile.location))
-                    .font(Theme.Fonts.caption)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-            }
-            Spacer(minLength: 0)
-            if profile.id == storage.activeId {
-                Image(systemName: "checkmark")
-                    .font(.system(.subheadline, weight: .semibold))
-                    .foregroundStyle(Theme.Colors.primary)
-            }
-            Image(systemName: "chevron.right")
-                .font(Theme.Icons.xs)
-                .foregroundStyle(Theme.Colors.onSurfaceMuted)
-        }
-        .settingsRowPadding()
-        .contentShape(Rectangle())
-    }
-
-    private func profileIcon(_ location: Profile.Location) -> String {
-        switch location {
-        case .local: "iphone"
-        case .iCloud: "icloud"
-        case .external: "folder"
-        }
-    }
-
-    private func profileLocation(_ location: Profile.Location) -> LocalizedStringKey {
-        switch location {
-        case .local: "On this device"
-        case .iCloud: "In iCloud"
-        case .external: "Opened from Files"
-        }
-    }
-
-}
-
-struct SheetCloseButton: ToolbarContent {
-    let action: () -> Void
-
-    var body: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            SheetDismissToolbarButton(accessibilityIdentifier: A11yID.Settings.close, action: action)
         }
     }
 }

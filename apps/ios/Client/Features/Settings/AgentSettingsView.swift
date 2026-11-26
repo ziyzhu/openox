@@ -232,8 +232,10 @@ struct DefaultAgentSettingsSection: View {
     private var registry: ProviderRegistry { .shared }
 
     private var value: Text {
-        if let endpoint = directory.defaultEndpoint { return Text(verbatim: directory.displayName(for: endpoint)) }
-        return Text("Current Device · \(DefaultAgentValue.model(registry))")
+        guard let endpoint = directory.defaultEndpoint else { return Text("Current Device · \(DefaultAgentValue.model(registry))") }
+        let name = directory.displayName(for: endpoint)
+        guard let model = directory.model(nil, endpoint: endpoint) else { return Text(verbatim: name) }
+        return Text(verbatim: "\(name) · \(model.name)")
     }
 
     var body: some View {

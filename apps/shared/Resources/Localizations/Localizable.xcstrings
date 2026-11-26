@@ -14277,6 +14277,16 @@
         }
       }
     },
+    "Use this Profile to change its agent, permissions, services, and secrets." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用此配置档案后，可更改它的智能体、权限、服务和密钥。"
+          }
+        }
+      }
+    },
     "Used by" : {
       "extractionState" : "stale",
       "localizations" : {

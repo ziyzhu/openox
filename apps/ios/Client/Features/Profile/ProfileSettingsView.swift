@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 struct ProfileSettingsView: View {
     let profileID: UUID
     let initialSkillDraft: SkillDraft?
+    let ready: Bool
+    let onSelectService: (Service) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(ConnectionAccess.self) private var connectionAccess
@@ -17,6 +19,7 @@ struct ProfileSettingsView: View {
     @State private var showingFiles = false
     @State private var choosingMoveLocation = false
     @State private var movedSource: (profile: Profile, inventory: [String: String])?
+    @State private var inactiveAgentName: String?
 
     private var storage: StorageRoot { .shared }
 
@@ -67,6 +70,12 @@ struct ProfileSettingsView: View {
                     if profile.version == ProfileSchema.current {
                         ProfileContentsView(profile: profile, initialSkillDraft: initialSkillDraft)
                             .id(profile.url.path)
+                        if isSelected {
+                            DefaultAgentSettingsSection()
+                            ProfileCapabilitiesSection(ready: ready, onSelectService: onSelectService)
+                        } else {
+                            inactiveAgentSection
+                        }
                         detailsSection(for: profile)
                         connectionsSection(for: profile)
                         exportSection(for: profile)
@@ -212,6 +221,18 @@ struct ProfileSettingsView: View {
         .settingsRowPadding()
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
+    }
+
+    private var inactiveAgentSection: some View {
+        SettingsSection(footer: "Use this Profile to change its agent, permissions, services, and secrets.", layout: .row) {
+            SettingsDisclosureRow(title: "Default agent", value: Text(verbatim: inactiveAgentName ?? L10n.string("Current Device")), indicator: nil)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier(A11yID.Settings.defaultAgent)
+        }
+        .task(id: profile?.url) {
+            guard let profile else { return }
+            inactiveAgentName = await RemoteAgentConfiguration.defaultAgentName(in: ProfileScope(profileID: profile.id, root: profile.url, location: profile.location))
+        }
     }
 
     private func detailsSection(for profile: Profile) -> some View {
