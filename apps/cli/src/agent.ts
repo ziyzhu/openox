@@ -90,7 +90,7 @@ async function preparePublication(local: boolean, port: number): Promise<Publica
   const binary = tailscaleBinary();
   try {
     const tailnet = await tailnetIdentity(binary);
-    await ensurePortFree(binary, port);
+    await ensurePortFree(binary, tailnet, port);
     return { kind: "tailscale", binary, tailnet };
   } catch (error) {
     return fail((error as Error).message);

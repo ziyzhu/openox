@@ -65,10 +65,45 @@ function publications(status: JSONObject): JSONObject[] {
   return [status, ...children];
 }
 
-export async function ensurePortFree(binary: string, port: number): Promise<void> {
+export async function ensurePortFree(binary: string, tailnet: Tailnet, port: number): Promise<void> {
+  const status = await runJSON(binary, ["serve", "status", "--json"]);
+  if (!routesPort(status, port)) return;
+  const orphans = servesTarget(status, tailnet.name, port) && !await listening(port) ? await orphanedServe(port) : [];
+  if (!orphans.length) throw new Error(`Tailscale Serve already has a route on HTTPS port ${port}; free it or choose another --port`);
+  for (const pid of orphans) signal(pid, "SIGTERM");
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline && routesPort(await runJSON(binary, ["serve", "status", "--json"]), port)) await Bun.sleep(250);
   if (routesPort(await runJSON(binary, ["serve", "status", "--json"]), port)) {
-    throw new Error(`Tailscale Serve already has a route on HTTPS port ${port}; free it or choose another --port`);
+    for (const pid of orphans) signal(pid, "SIGKILL");
+    await Bun.sleep(500);
   }
+  if (routesPort(await runJSON(binary, ["serve", "status", "--json"]), port)) {
+    throw new Error(`Tailscale Serve still routes HTTPS port ${port} after stopping a previous ox agent serve`);
+  }
+  agentLog("tailscale.reclaimed", { port, processes: orphans.length });
+}
+
+async function listening(port: number): Promise<boolean> {
+  try {
+    const socket = await Bun.connect({ hostname: "127.0.0.1", port, socket: { data() {} } });
+    socket.end();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function orphanedServe(port: number): Promise<number[]> {
+  const listed = Bun.spawnSync(["/bin/ps", "-axo", "pid=,command="]).stdout.toString();
+  const command = `serve --https=${port} --yes http://127.0.0.1:${port}`;
+  return listed.split("\n").flatMap((line) => {
+    const match = line.trim().match(/^(\d+)\s+(.*)$/);
+    return match && /tailscale/.test(match[2]) && match[2].endsWith(command) ? [Number(match[1])] : [];
+  });
+}
+
+function signal(pid: number, name: NodeJS.Signals) {
+  try { process.kill(pid, name); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error; }
 }
 
 export async function publish(binary: string, tailnet: Tailnet, port: number): Promise<Publication> {
