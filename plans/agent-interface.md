@@ -136,9 +136,10 @@ Agent machine limits:
   folders.json          set by `ox agent serve --directory` and `ox agent folders` on that machine
 + folders.add/remove    accepted over loopback only; Hosts read folders, never change them
 + conversations.new     result + cwd; the Host stores it on RemoteAgentBinding
-+ serve --tools         limit of pi tools (read, grep, find, ls, edit, write, bash), reported in agent.describe.tools
-+ agentTools            the Host picks a subset per conversation on new/open/setTools → pi --tools
-+ Shell access          per-conversation toggle, offered only when serve allows bash; bash prompts answered in the app
+  serve --tools         limit of pi built-in tools (read, bash, edit, write, grep, find, ls), reported in agent.describe.tools
+  context.agentTools    the Host's per-conversation selection, sent with every context; the Ox extension applies it with pi.setActiveTools on the next turn and blocks built-ins outside it
+  context.confirmTools  tools whose every call asks through ctx.ui.confirm → conversations.prompt → the app
+  Shell                 Off / Ask each time / On per conversation, default Ask; offered only when serve allows bash; conversations from before this keep pi's defaults
 ```
 
 The built-in agent gets no shell; it delegates shell work with `ox.conversation.start({ agent })`. A remote machine's folders are not mounted into `ox.fs` for now.
@@ -164,8 +165,8 @@ Website data moves between Profiles and devices with `WKWebsiteDataStore.fetchDa
 
 Order:
 
-1. Folders writable only over loopback; `cwd` in `conversations.new`.
-2. Tool limit, `agentTools`, `setTools`, Shell access toggle.
+1. Done: folders writable only over loopback; `cwd` in `conversations.new`.
+2. Done: tool limit, `agentTools` and `confirmTools` in context, Shell picker.
 3. Per-Profile secrets (prefixed Keychain accounts) and website logins (store per Profile), migrated to the Profile selected at upgrade.
 4. Website data export and import with `fetchData`/`restoreData`, after a device check of what restores.
 5. Move policy, services, providers and remote agents into the Profile (storage migration).

@@ -29,8 +29,12 @@ import { admission, HEALTH_NAME, type Tailnet } from "./agent-tailscale.ts";
 import { ToolBridge } from "./agent-tools.ts";
 
 export type AgentSocket = ServerWebSocket<{ id: string; conversations: Set<string>; via: "loopback" | "tailnet" }>;
+export const PI_BUILTIN_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"] as const;
+const PI_DEFAULT_TOOLS = ["read", "bash", "edit", "write"];
+
 export type AgentServeOptions = {
   folders: string[];
+  tools?: string[];
   approval: Approval;
   executable: string;
   stateDirectory: string;
@@ -290,6 +294,7 @@ export class AgentServer {
       machine: hostname(),
       folder: this.workspaces,
       folders: this.folders.list(),
+      tools: this.toolLimit(),
       protocols: { agent: [AGENT_PROTOCOL_VERSION] },
       methods: Object.keys(this.handlers),
     };
@@ -424,7 +429,14 @@ export class AgentServer {
       `Folders the user authorized on this machine:\n${authorized}`,
       "Ask before reading or changing files outside these folders. macOS may block protected folders such as Desktop, Documents and Downloads until the user allows access on this Mac; if a read stalls or is denied there, ask the user to authorize the folder with `ox agent folders add <path>` on this Mac.",
     ].join("\n\n");
-    return { sections: { ...conversation.context.sections, ox_agent_workspace: workspace } };
+    const limit = this.toolLimit();
+    const agentTools = (conversation.context.agentTools ?? PI_DEFAULT_TOOLS).filter((tool) => limit.includes(tool));
+    const confirmTools = (conversation.context.confirmTools ?? []).filter((tool) => agentTools.includes(tool));
+    return { sections: { ...conversation.context.sections, ox_agent_workspace: workspace }, agentTools, confirmTools };
+  }
+
+  private toolLimit(): string[] {
+    return this.options.tools ?? [...PI_BUILTIN_TOOLS];
   }
 
   private async listFolders() {

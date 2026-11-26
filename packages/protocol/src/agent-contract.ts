@@ -21,6 +21,8 @@ export const AgentSchemas = {
   AgentEmptyResult: object("AgentEmptyResult", {}),
   AgentContext: object("AgentContext", {
     sections: Type.Record(S(), S(), { description: "Ox system prompt and per-turn sections keyed by section tag, applied with pi's section diffing." }),
+    agentTools: Type.Optional(A(S(), { description: "pi built-in tools this conversation may use, within agent.describe.tools; omitted, pi's default selection within the limit." })),
+    confirmTools: Type.Optional(A(S(), { description: "pi built-in tools whose every call asks the user through conversations.prompt." })),
   }),
   AgentTool: object("AgentTool", { name: S(), description: S(), parameters: json() }),
   AgentDescription: object("AgentDescription", {
@@ -28,6 +30,7 @@ export const AgentSchemas = {
     machine: S(),
     folder: S({ description: "Parent of the working folders the agent creates for conversations started without a cwd." }),
     folders: A(S(), { description: "Authorized folders; a new conversation may use any of them or a descendant as its cwd." }),
+    tools: optional(A(S(), { description: "pi built-in tools this machine allows, set by ox agent serve --tools." })),
     protocols: Type.Record(S(), A(I({ minimum: 1 }))), methods: A(S()),
   }),
   AgentModel: object("AgentModel", {

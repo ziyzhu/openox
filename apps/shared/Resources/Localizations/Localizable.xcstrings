@@ -97,6 +97,17 @@
         }
       }
     },
+    "Agent default" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能体默认"
+          }
+        }
+      }
+    },
     "Allow microphone access to use voice input." : {
       "localizations" : {
         "zh-Hans" : {
@@ -113,6 +124,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "应用语言"
+          }
+        }
+      }
+    },
+    "Approve each command in Ox" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Ox 中批准每条命令"
+          }
+        }
+      }
+    },
+    "Ask each time" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每次询问"
           }
         }
       }
@@ -144,6 +177,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在下载语音模型… %lld%%"
+          }
+        }
+      }
+    },
+    "Files only, no commands" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅文件，不运行命令"
           }
         }
       }
@@ -239,6 +283,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "松开添加到草稿"
+          }
+        }
+      }
+    },
+    "Run commands without asking" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直接运行命令，不询问"
+          }
+        }
+      }
+    },
+    "Shell" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "终端"
           }
         }
       }

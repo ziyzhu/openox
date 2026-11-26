@@ -36,6 +36,13 @@ extension Conversation {
         Log.session.info("Conversation.agent folder id=\(id) own=\(folder == nil) chars=\(folder?.count ?? 0)")
     }
 
+    func selectRemoteShell(_ shell: ShellAccess) {
+        guard var binding = remoteAgent, binding.shell != shell else { return }
+        binding.shell = shell
+        remoteAgent = binding
+        Log.session.info("Conversation.agent shell id=\(id) access=\(shell.rawValue)")
+    }
+
     func selectRemoteThinking(_ level: String) {
         updateRemoteSelection(model: nil, thinking: level)
     }
@@ -249,7 +256,12 @@ extension Conversation {
             "turnState": turnState ?? .object([:]), "conversationID": .int(route.conversationID),
         ]))
         let sections = (value.objectValue?["sections"]?.objectValue ?? [:]).reduce(into: [String: JSONValue]()) { $0["ox_\($1.key)"] = $1.value }
-        return .object(["sections": .object(sections)])
+        var context: [String: JSONValue] = ["sections": .object(sections)]
+        if let shell = remoteAgent?.shell {
+            context["agentTools"] = .array(shell.agentTools.map(JSONValue.string))
+            context["confirmTools"] = .array(shell.confirmTools.map(JSONValue.string))
+        }
+        return .object(context)
     }
 
     private func remoteMessage(_ input: ConversationInput) async throws -> [String: JSONValue] {
@@ -501,6 +513,7 @@ extension Conversation {
                 "address": .string(binding.endpoint.absoluteString),
                 "machine": directory.machine(for: binding.endpoint).map(JSONValue.string) ?? .null,
                 "folder": (binding.cwd ?? binding.folder).map(JSONValue.string) ?? .null,
+                "shell": binding.shell.map { .string($0.rawValue) } ?? .null,
             ]),
             "provider": .object(["id": .string(reference?.provider ?? "agent"), "name": .string(reference?.provider ?? directory.displayName(for: binding.endpoint))]),
             "model": .object(["id": .string(reference?.id ?? "default"), "name": .string(reference.flatMap { directory.modelName($0, endpoint: binding.endpoint) } ?? reference?.id ?? "Agent default")]),

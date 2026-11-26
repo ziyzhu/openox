@@ -7,18 +7,28 @@ export const HOST_UNAVAILABLE = "Ox Host is unavailable";
 const SOURCE = String.raw`
 const bridge = process.env.OX_AGENT_BRIDGE;
 const unavailable = "Ox Host is unavailable";
+const builtin = new Set(["read", "bash", "edit", "write", "grep", "find", "ls"]);
 
 export default async function oxExtension(pi) {
   if (!bridge) return;
   const registered = new Map();
   let applied = [];
+  let allowed = new Set();
+  let confirmed = new Set();
 
   async function sync() {
     const response = await fetch(bridge + "/context");
     if (!response.ok) throw new Error("Ox context request failed with status " + response.status);
     const context = await response.json();
     for (const tool of context.tools) register(tool);
+    allowed = new Set(context.agentTools || []);
+    confirmed = new Set(context.confirmTools || []);
     return context;
+  }
+
+  function activate() {
+    const kept = pi.getActiveTools().filter((name) => !builtin.has(name));
+    pi.setActiveTools([...new Set([...kept, ...allowed])]);
   }
 
   function register(tool) {
@@ -36,14 +46,32 @@ export default async function oxExtension(pi) {
 
   await sync();
 
+  pi.on("session_start", () => activate());
+
+  pi.on("tool_call", async (event, ctx) => {
+    if (builtin.has(event.toolName) && !allowed.has(event.toolName)) {
+      return { block: true, reason: event.toolName + " is turned off for this conversation in Ox" };
+    }
+    if (!confirmed.has(event.toolName)) return undefined;
+    const ok = await ctx.ui.confirm("Allow " + event.toolName + "?", describe(event));
+    return ok ? undefined : { block: true, reason: "The user declined this " + event.toolName + " call" };
+  });
+
   pi.on("before_agent_start", async (event) => {
     const { sections } = await sync();
+    activate();
     const options = event.systemPromptOptions;
     options.sections = options.sections || {};
     for (const key of applied) if (!Object.hasOwn(sections, key)) delete options.sections[key];
     for (const [key, text] of Object.entries(sections)) options.sections[key] = text;
     applied = Object.keys(sections);
   });
+}
+
+function describe(event) {
+  const input = event.input || {};
+  const text = typeof input.command === "string" ? input.command : JSON.stringify(input);
+  return text.length > 2000 ? text.slice(0, 1999) + "…" : text;
 }
 
 async function callHost(name, toolCallId, args, signal, onUpdate) {

@@ -80,7 +80,7 @@ export class ToolBridge {
     const target = this.resolve(token);
     if (!target) return new Response("Forbidden", { status: 403 });
     const path = route.join("/");
-    if (request.method === "GET" && path === "context") return Response.json({ sections: target.context.sections, tools: target.tools });
+    if (request.method === "GET" && path === "context") return Response.json({ ...target.context, tools: target.tools });
     if (request.method === "POST" && path === "tools/call") {
       const body = await request.json().catch(() => undefined) as { toolCallId?: unknown; name?: unknown; args?: unknown } | undefined;
       if (typeof body?.toolCallId !== "string" || typeof body.name !== "string") return new Response("Invalid tool call", { status: 400 });
