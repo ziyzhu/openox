@@ -96,7 +96,7 @@ ox agent serve [--port 9877] [--cwd <folder>] [--approve | --no-approve]
 
 The Host composes context and runs tools for every agent. For a remote pi, a small Ox extension loaded with `-e` carries both, so pi treats them exactly as pi-durable does.
 
-- Context: `composePrompt` moves from the local agent to the Host. The same system prompt (preamble, rules, memory, personal context) and per-turn sections (skills, attached services, host context, reply format, response language) are rendered for every agent. The extension writes them into `systemPromptOptions.sections` in `before_agent_start`; pi diffs the sections and appends one system patch, the same system-update mechanism the built-in agent uses through pi-ai.
+- Context: `composePrompt` moves from the local agent to the Host. The same system prompt (preamble, rules, memory, personal context) and per-turn sections (skills, attached services, host context, reply format, response language) are rendered for every agent. A remote pi keeps its default coding prompt; the extension adds Ox's sections to `systemPromptOptions.sections` in `before_agent_start` and never sets `forceSystemPrompt`; pi diffs the sections and appends one system patch, the same system-update mechanism the built-in agent uses through pi-ai.
 - Tools: the extension registers `execute` with `pi.registerTool`. Each call becomes `tools.call` to the Host, which runs `ConversationTool.execute` in that conversation's VM. Same functions, limits, approvals and invocation cards as the built-in agent; secrets resolve on the Host and never reach the agent's machine.
 - Two file systems: pi's own tools (`read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`) act on its machine, `ox.fs` acts on Ox files on the Host. The context names both; skill files are read through `execute`.
 - While a call waits on the user (`ox.user.choose`), the extension streams `tools.progress` through pi's tool update callback.
@@ -255,7 +255,6 @@ Later, if wanted: let the built-in agent use a remote machine's pi providers (fo
 
 ## Open questions
 
-- Whether a remote pi keeps its default coding prompt with Ox's sections added, or Ox's prompt replaces it (`forceSystemPrompt`) with a short note about pi's machine tools.
 - Where the relay runs, and how it limits who can send to a token (pairing secret, rate limits, App Attest).
 - Whether `ox agent serve` advertises itself for discovery the way Hosts do, or is added by endpoint only in v1.
 - Whether loading the Ox extension in a terminal pi should later report that session live to `ox agent serve`.
