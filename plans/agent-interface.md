@@ -8,7 +8,8 @@ Status: proposed; no runtime changes. Separate Ox into Client, Host and Agent, s
 
 | Concern | Actions | Destination |
 |---|---|---|
-| Agent | `attach`, `run`, `continue`, `abort`, `resume`, `resumeExisting`, `conversationContext`, `composePrompt` | the agent interface |
+| Agent | `attach`, `run`, `continue`, `abort`, `resume`, `resumeExisting`, `conversationContext` | the agent interface |
+| Context | `composePrompt`, per-turn sections, system updates | Host-composed for every agent |
 | Host storage | `application*`, `conversationList/History/Present/Read/Record`, schedules, profile, `file*` | stays Host-internal for every conversation |
 | Ox tool backends | `filesystem*`, `fileMounts`, `skillPackages`, `nativeModel`, `nativeTool` | stays inside the local agent |
 
@@ -20,11 +21,12 @@ Only the first row belongs to an agent. Because all three share one channel, no 
 - Two connection kinds only: `.local` (built-in pi-durable in-process) and `.remote(endpoint)` (WebSocket JSON-RPC 2.0 to `ox agent serve`).
 - One vocabulary: conversations. pi sessions, Claude Code sessions and Codex threads are all conversations; those words exist only inside translators.
 - Conversations started in a terminal on the agent's machine appear in Ox.
+- Every agent gets the same context and tools as the built-in agent: Ox's system prompt, memory, personal context, skills, attached services, and the `execute` tool with the full `ox.*` catalog, run on the Host.
 - The Host notifies a Client whose app is closed, whatever the agent.
 - Agent-specific translation lives in `ox agent serve`, never in the Host.
 - With only the built-in agent configured, behavior and UI are unchanged.
 
-Non-goals for v1: Ox tools (services, VM, canvas, skills) inside external agents, which can later be offered as an MCP server passed at launch; Ox-side compaction or prompt composition for external agents; switching agent within a conversation; live mirroring of a pi or Claude Code terminal while it is running.
+Non-goals for v1: Ox-side compaction for external agents; switching agent within a conversation; live mirroring of a pi or Claude Code terminal while it is running.
 
 ## Mirror of Client↔Host
 
@@ -51,10 +53,10 @@ Envelope is JSON-RPC 2.0 like Client↔Host. Payloads are pi's RPC events and pi
 agent.describe              → implementation {name, version}, machine, folder, protocols {agent: [1]}, methods
 models.list                 → models
 conversations.list          → [{id, title, cwd, state: idle|running|blocked, origin: terminal|ox, updatedAt}]
-conversations.new           {cwd?, model?} → {id}
-conversations.open          {id} → {messages, state}        subscribes to its notifications
+conversations.new           {cwd?, model?, context, tools} → {id}
+conversations.open          {id, context, tools} → {messages, state}   subscribes to its notifications
 conversations.close         {id}
-conversations.send          {id, text, images?, delivery?: steer|followUp} → {disposition}
+conversations.send          {id, text, images?, delivery?: steer|followUp, contextUpdate?} → {disposition}
 conversations.stop          {id}
 conversations.respond       {id, promptId, answer}
 conversations.setModel      {id, provider, model}
@@ -65,12 +67,16 @@ conversations.fork          {id, entryId} → {id}
 notify conversations.event   {id, event}       agent_start, agent_settled, turn_*, message_*, tool_execution_*, compaction_*, queue_update
 notify conversations.prompt  {id, promptId, method: confirm|select|input|editor, title, options?, toolCallId?}
 notify conversations.changed {id, state, title}
+request tools.call           {id, toolCallId, name, args} → result     agent → Host on the same WebSocket
+notify tools.progress        {id, toolCallId, message}
 ```
 
 - Required: `agent.describe`, `conversations.list/new/open/send/stop/respond`. Everything else is optional and listed in `methods`.
 - `id` is the agent's own conversation identity (pi session ID, Claude Code session ID, Codex thread ID). The Host keeps its own conversation ID and stores the agent's next to it.
 - `message_end` carries an optional `entryId` so the paged-history covered-entries range works for every agent.
 - `toolCallId` on prompts links a permission request to the tool call it is about.
+- `context` is the composed Ox system prompt; `contextUpdate` is a rendered system update sent only when per-turn sections or memory changed since the last send.
+- `tools` is the manifest of Host tools (today only `execute`, with its catalog description).
 
 ## Translators
 
@@ -82,9 +88,22 @@ notify conversations.changed {id, state, title}
 | `open` messages | `get_messages` | session JSONL on disk | `thread/read`, `thread/items/list` |
 | Prompts | extension UI dialogs | permission control requests | `item/*/requestApproval`, `item/tool/requestUserInput` |
 | Busy in a terminal | read-only until idle | read-only until idle | live, as another client of the same thread |
+| Ox context | `--append-system-prompt`; updates prefixed to the next prompt | `--append-system-prompt`; updates prefixed to the next user message | `developerInstructions` on `thread/start`; updates via `thread/inject_items` |
+| Ox tools | MCP server registered for the process | `--mcp-config`, `--allowedTools mcp__ox__execute` | MCP server in the thread `config`, approval policy allows it |
 | Unattended trust | `--approve` / `--no-approve` per agent entry | `--permission-mode` per agent entry | `--sandbox`, `--ask-for-approval` per agent entry |
 
 Translators call binaries directly, never through shell aliases.
+
+## Context and tools
+
+The Host composes context and runs tools for every agent, so a remote agent sees what the built-in agent sees.
+
+- Context: `composePrompt` moves from the local agent to the Host. The same system prompt (preamble, rules, memory, personal context) and per-turn sections (skills, attached services, host context, reply format, response language) are rendered for every agent. The local agent keeps receiving them as its system prompt and system updates; a remote agent gets the system prompt appended to its own and updates rendered with the same `renderSystemMessageUpdate` format ahead of the next user message.
+- Tools: `ox agent serve` runs a per-conversation MCP server (streamable HTTP on loopback, per-conversation token) exposing `execute`. Each call becomes `tools.call` to the Host, which runs `ConversationTool.execute` in that conversation's VM. Same functions, limits, approvals and invocation cards as the built-in agent; secrets resolve on the Host and never reach the agent.
+- Two file systems: the agent's own tools act on its machine, `ox.fs` acts on Ox files on the Host. The context names both; skill files are read through `execute`.
+- Translators pre-allow the Ox MCP tool so Ox's checks are the only approval, and set agent-side tool timeouts above the VM timeout, with `tools.progress` while a call waits on the user.
+- If the Host is unavailable mid-run, `tools.call` fails fast with "Ox Host is unavailable" and the agent continues without Ox tools.
+- Memory and personal context reach whichever model provider the remote agent uses, as they reach the Host's provider today.
 
 ## Host
 
@@ -96,6 +115,7 @@ Conversation ──► AgentConnection
 
 - `AgentEvent` keeps its cases; pi event names map onto them for both connections.
 - `resumeSubmission` moves inside `LocalAgent`. External agents resume through their own conversation.
+- `RemoteAgent` answers `tools.call` with the conversation's `ConversationTool` and shows one execute card per call, matched by `toolCallId`.
 - Model list for the picker comes from `models.list`. `LocalAgent` answers from the Host's providers, so one picker serves every agent.
 - External conversations still use the durable DB for metadata, `ox.native.presentation` copies and read state, with no model entries.
 - Agent conversations not yet known to the Host show under their agent and become Host conversations when opened.
@@ -151,6 +171,7 @@ The Host is the only sender. Agents and `ox agent serve` know nothing about noti
 +   Connection/AgentConnection.swift
 +   Connection/LocalAgent.swift
 +   Connection/RemoteAgent.swift
++   AgentContext composition moved from packages/agent to a Host-level composer used by both connections
   apps/shared/Host/Notifications/
 +   PushNotifier.swift                   phase change + no watcher → relay
   apps/shared/Platform/Models/
@@ -177,6 +198,7 @@ The Host is the only sender. Agents and `ox agent serve` know nothing about noti
 +   agents/pi.ts
 +   agents/claude-code.ts
 +   agents/codex.ts
++   agent-tools-mcp.ts                     per-conversation MCP server → tools.call
   apps/ios/
 +   NotificationService/                 Notification Service Extension target
     ios.entitlements                     ~ aps-environment
@@ -204,6 +226,7 @@ The Host is the only sender. Agents and `ox agent serve` know nothing about noti
 - → agentEvents → DurableAgentHost.receive → Conversation.receiveAgentEvent
 + → conversations.event → AgentEvent → Conversation.receive
   → ConversationDocument → Client stream
++ → agent calls mcp__ox__execute → ox agent serve → tools.call → ConversationTool.execute (Host VM) → result
 + → phase change, no watcher → PushNotifier → relay → APNs → Notification Service Extension
 ```
 
@@ -228,7 +251,7 @@ Old conversations decode as `.local` and need no migration. A Host older than th
 
 1. Rename the local agent's actions and events to pi names. No behavior change.
 2. Add `AgentConnection` and `LocalAgent`; rename the top-bar button and picker sheet. Ox is the only agent.
-3. Add `ox agent serve` with the Codex translator, `RemoteAgent`, `agents.*`, the storage field, and the Agents settings page.
+3. Add `ox agent serve` with the Codex translator, `RemoteAgent`, `agents.*`, the storage field, the Agents settings page, Host-composed context, and the `tools.call` MCP bridge, so parity ships with the first remote agent.
 4. Add the pi and Claude Code translators; upload agent icons.
 5. Add the push relay, `PushNotifier`, `notifications.*`, and the Notification Service Extension.
 6. Update README, `OnboardingView.swift` and the website together.
@@ -236,6 +259,7 @@ Old conversations decode as `.local` and need no migration. A Host older than th
 ## Open questions
 
 - Exact Claude Code control requests (interrupt, permission, set model) and `stream_event` shapes; whether Codex's terminal UI always uses the shared daemon. Confirmed by a spike in step 3–4.
+- How Ox's preamble and rules sit next to each agent's own system prompt (identity, reply style) without conflict; checked per translator in the spike.
 - Where the relay runs, and how it limits who can send to a token (pairing secret, rate limits, App Attest).
 - Whether `ox agent serve` advertises itself for discovery the way Hosts do, or is added by endpoint only in v1.
 - How an older Host should present a conversation whose agent it does not know.
