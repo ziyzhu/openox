@@ -22,7 +22,7 @@ struct AgentPickerSheet: View {
                         : conversation.isBusy
                             ? "Changes apply after the current response and stay with this conversation."
                             : "Changes apply immediately and stay with this conversation.",
-                    header: agents.agents.isEmpty ? nil : AnyView(AgentSelectionGroup(conversation: conversation)),
+                    header: conversation.canChangeAgent || !agents.agents.isEmpty ? AnyView(AgentSelectionGroup(conversation: conversation)) : nil,
                     onClose: { dismiss() }
                 ) { client, model, selection in
                     if registry.defaultModel == nil {
@@ -39,6 +39,7 @@ struct AgentPickerSheet: View {
 
 struct AgentSelectionGroup: View {
     let conversation: Conversation
+    @State private var addingAgent = false
     private var agents: RemoteAgentDirectory { .shared }
 
     var body: some View {
@@ -46,7 +47,7 @@ struct AgentSelectionGroup: View {
             VStack(spacing: 0) {
                 Menu {
                     Button { select(nil) } label: {
-                        Label { Text("Ox") } icon: { if conversation.remoteAgent == nil { Image(systemName: "checkmark") } }
+                        Label { Text("Current Device") } icon: { if conversation.remoteAgent == nil { Image(systemName: "checkmark") } }
                     }
                     .accessibilityIdentifier(A11yID.ConversationControls.agentOption("local"))
                     ForEach(agents.agents) { agent in
@@ -58,11 +59,15 @@ struct AgentSelectionGroup: View {
                                 if conversation.remoteAgent?.endpoint == agent.endpoint { Image(systemName: "checkmark") }
                             }
                         }
-                        .disabled(agents.statuses[agent.endpoint]?.isOnline != true)
                         .accessibilityIdentifier(A11yID.ConversationControls.agentOption(agent.name))
                     }
+                    Divider()
+                    Button { addingAgent = true } label: {
+                        Label("Add Remote Agent…", systemImage: "plus")
+                    }
+                    .accessibilityIdentifier(A11yID.ConversationControls.agentAdd)
                 } label: {
-                    SettingsDisclosureRow(title: "Agent", value: Text(verbatim: conversation.remoteAgentName ?? "Ox"),
+                    SettingsDisclosureRow(title: "Agent", value: conversation.remoteAgentName.map { Text(verbatim: $0) } ?? Text("Current Device"),
                                           indicator: conversation.canChangeAgent ? "chevron.up.chevron.down" : nil)
                 }
                 .disabled(!conversation.canChangeAgent)
@@ -75,6 +80,9 @@ struct AgentSelectionGroup: View {
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .settingsContentInset()
             }
+        }
+        .sheet(isPresented: $addingAgent) {
+            RemoteAgentCreationSheet { endpoint in select(endpoint) }
         }
     }
 

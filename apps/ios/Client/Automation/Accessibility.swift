@@ -193,6 +193,7 @@ nonisolated enum A11yID {
         static let export = "conversation.export"
         static let agentPicker = "conversation.agentPicker"
         static let agentMenu = "conversation.agentMenu"
+        static let agentAdd = "conversation.agentAdd"
         static func agentOption(_ name: String) -> String { "conversation.agentOption.\(name)" }
         static let agentModelMenu = "conversation.agentModelMenu"
         static let modelSetup = "conversation.modelSetup"

@@ -108,7 +108,8 @@ struct AgentSettingsView: View {
     }
 }
 
-private struct RemoteAgentCreationSheet: View {
+struct RemoteAgentCreationSheet: View {
+    var onAdded: (URL) -> Void = { _ in }
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var address = ""
@@ -163,6 +164,7 @@ private struct RemoteAgentCreationSheet: View {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
             try RemoteAgentDirectory.shared.add(name: trimmed.isEmpty ? endpoint.host() ?? endpoint.absoluteString : trimmed, endpoint: endpoint)
+            onAdded(endpoint)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
