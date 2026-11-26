@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import packageMetadata from "./package.json";
 import { buildStandalone, nativePlatform } from "./standalone.ts";
-import { hostFixtureReply } from "./standalone-host-fixture.ts";
+import { profileFixtureReply } from "./standalone-profile-fixture.ts";
 
 const { values } = parseArgs({ options: { out: { type: "string" } } });
 const temporaryRoot = await mkdtemp(join(tmpdir(), "ox-cli-standalone-check-"));
@@ -22,7 +22,7 @@ const server = Bun.serve({
   },
   websocket: {
     message(socket, message) {
-      socket.send(JSON.stringify(hostFixtureReply(JSON.parse(String(message)))));
+      socket.send(JSON.stringify(profileFixtureReply(JSON.parse(String(message)))));
     },
   },
 });
@@ -67,28 +67,28 @@ exec '${Bun.which("curl")!.replaceAll("'", "'\\''")}' "$@"
     throw new Error("Standalone executable could not inspect the example repository");
   }
   await run([executable, "--repository", repositoryDirectory, "repository", "validate"]);
-  const candidates = JSON.parse(await run([executable, "host", "list", "--all", "--json"]));
-  const configured = candidates.hosts.find((host: { source: string }) => host.source === "configuration");
+  const candidates = JSON.parse(await run([executable, "profile", "discover", "--all", "--json"]));
+  const configured = candidates.devices.find((device: { source: string }) => device.source === "configuration");
   if (configured?.endpoint !== "ws://127.0.0.1:9876") throw new Error("Standalone loaded the working directory's .env");
   const inventory = JSON.stringify({ devices: { fixture: [{ name: "Standalone fixture", udid: "standalone-fixture", state: "Booted" }] } });
   await writeFile(join(tools, "xcrun"), `#!/bin/sh\nif [ "$2" = list ]; then\n  printf '%s\\n' '${inventory}'\nelse\n  printf '%s\\n' '1234 0 UIKitApplication:ai.openox.fixture'\nfi\n`);
   await writeFile(join(tools, "lsof"), `#!/bin/sh\nprintf '%s\\n' 'p1234' 'n127.0.0.1:${server.port}'\n`);
   for (const tool of ["xcrun", "lsof"]) await chmod(join(tools, tool), 0o755);
-  const discovery = JSON.parse(await run([executable, "--host", `ws://127.0.0.1:${server.port}`, "host", "list", "--json"], { ...environment, PATH: tools }));
-  if (process.platform === "darwin" && !discovery.hosts.some((host: { source: string }) => host.source === "simctl")) {
-    throw new Error("Standalone Host discovery did not use native Simulator inventory and listeners");
+  const discovery = JSON.parse(await run([executable, "--profile", `ws://127.0.0.1:${server.port}`, "profile", "discover", "--json"], { ...environment, PATH: tools }));
+  if (process.platform === "darwin" && !discovery.devices.some((device: { source: string }) => device.source === "simctl")) {
+    throw new Error("Standalone Profile discovery did not use native Simulator inventory and listeners");
   }
-  if (!discovery.hosts.some((host: { endpoint: string; reachable: boolean }) =>
-    host.endpoint === `ws://127.0.0.1:${server.port}` && host.reachable)) {
-    throw new Error("Standalone Host discovery missed the reachable fixture");
+  if (!discovery.devices.some((device: { endpoint: string; reachable: boolean }) =>
+    device.endpoint === `ws://127.0.0.1:${server.port}` && device.reachable)) {
+    throw new Error("Standalone Profile discovery missed the reachable fixture");
   }
-  const conversations = JSON.parse(await run([executable, "--host", `ws://127.0.0.1:${server.port}`, "conversation", "list", "--json"]));
-  if (conversations[0]?.id !== "standalone-smoke") throw new Error("Standalone Host request failed");
-  const hostArgs = [executable, "--host", `ws://127.0.0.1:${server.port}`];
-  const created = JSON.parse(await run([...hostArgs, "conversation", "new", "--temporary", "--provider", "mock", "--model", "mock", "--json"]));
-  const outcome = JSON.parse(await run([...hostArgs, "--conversation", created.conversationId, "conversation", "send", "hello", "--json"]));
+  const conversations = JSON.parse(await run([executable, "--profile", `ws://127.0.0.1:${server.port}`, "conversation", "list", "--json"]));
+  if (conversations[0]?.id !== "standalone-smoke") throw new Error("Standalone Profile request failed");
+  const profileArgs = [executable, "--profile", `ws://127.0.0.1:${server.port}`];
+  const created = JSON.parse(await run([...profileArgs, "conversation", "new", "--temporary", "--provider", "mock", "--model", "mock", "--json"]));
+  const outcome = JSON.parse(await run([...profileArgs, "--conversation", created.conversationId, "conversation", "send", "hello", "--json"]));
   if (outcome.outcome !== "completed" || outcome.text !== "Hello from the fixture.") throw new Error("Standalone conversation send failed");
-  const snapshot = JSON.parse(await run([...hostArgs, "--conversation", created.conversationId, "conversation", "inspect", "--json"]));
+  const snapshot = JSON.parse(await run([...profileArgs, "--conversation", created.conversationId, "conversation", "inspect", "--json"]));
   if (snapshot.id !== created.conversationId || snapshot.isBusy || !snapshot.messages.length) throw new Error("Standalone conversation inspection failed");
   console.log(`PASS standalone ${nativePlatform}: download, install, version, help, repository validation, discovery, conversation create/send/inspect; no Bun or Node on PATH`);
 } finally {

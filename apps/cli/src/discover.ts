@@ -1,12 +1,12 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { DEFAULT_HOST_PORT, hostEndpoint } from "./host-connection.ts";
-import { HostRPCClient } from "./host-rpc.ts";
+import { DEFAULT_PORT, profileEndpoint } from "./profile-connection.ts";
+import { ProfileRPCClient } from "./profile-rpc.ts";
 import { fail, type CliContext } from "./lib.ts";
 
 type Device = { name: string; udid: string; state: string; isAvailable?: boolean };
 const execute = promisify(execFile);
-type HostCandidate = { endpoint: string; label: string; kind: string; source: string };
+type DeviceCandidate = { endpoint: string; label: string; kind: string; source: string };
 
 export async function discover(args: string[], context: CliContext): Promise<void> {
   let json = false;
@@ -19,13 +19,13 @@ export async function discover(args: string[], context: CliContext): Promise<voi
     else if (argument === "--timeout") timeoutMs = positiveNumber(args[++index], "--timeout");
     else if (argument.startsWith("--timeout=")) timeoutMs = positiveNumber(argument.slice(10), "--timeout");
     else if (argument === "-h" || argument === "--help") {
-      console.log("Usage: ox host list [--all] [--json] [--timeout 3000]");
+      console.log("Usage: ox profile discover [--all] [--json] [--timeout 3000]");
       return;
     } else fail(`unknown option: ${argument}`);
   }
-  const selected = normalizedEndpoint(hostEndpoint(context.host));
-  const candidates = new Map<string, HostCandidate>();
-  candidates.set(selected, { endpoint: selected, label: "configured Host", kind: "unknown", source: "configuration" });
+  const selected = normalizedEndpoint(profileEndpoint(context.endpoint));
+  const candidates = new Map<string, DeviceCandidate>();
+  candidates.set(selected, { endpoint: selected, label: "configured Profile", kind: "unknown", source: "configuration" });
   let warning = "";
   try {
     for (const candidate of await discoverSimulators(timeoutMs)) {
@@ -45,7 +45,7 @@ export async function discover(args: string[], context: CliContext): Promise<voi
         const address = peer.TailscaleIPs?.find(ip => !ip.includes(":"));
         const kind = peer.OS === "iOS" ? "ios-device" : peer.OS?.toLowerCase() ?? "unknown";
         const peerCandidates = [
-          ...(address ? [{ endpoint: `ws://${address}:${DEFAULT_HOST_PORT}`, source: "tailscale" }] : []),
+          ...(address ? [{ endpoint: `ws://${address}:${DEFAULT_PORT}`, source: "tailscale" }] : []),
           ...(name && peer.OS !== "iOS" ? [{ endpoint: `wss://${name}`, source: "tailscale-https" }] : []),
         ];
         for (const { endpoint, source } of peerCandidates) {
@@ -53,11 +53,11 @@ export async function discover(args: string[], context: CliContext): Promise<voi
         }
       }
     } catch {
-      warning = [warning, "Tailscale discovery unavailable; connect Tailscale or pass --host explicitly"].filter(Boolean).join("; ");
+      warning = [warning, "Tailscale discovery unavailable; connect Tailscale or pass --profile <ws-url>"].filter(Boolean).join("; ");
     }
   }
   const probed = await Promise.all([...candidates.values()].map(async candidate => {
-    const client = new HostRPCClient(candidate.endpoint);
+    const client = new ProfileRPCClient(candidate.endpoint);
     try {
       const description = await client.describe(timeoutMs);
       return { ...candidate, reachable: true, implementation: description.implementation };
@@ -65,17 +65,17 @@ export async function discover(args: string[], context: CliContext): Promise<voi
       return { ...candidate, reachable: false };
     } finally { client.close(); }
   }));
-  const hosts = probed.filter(host => all || host.reachable);
+  const devices = probed.filter(device => all || device.reachable);
   if (json) {
-    console.log(JSON.stringify({ hosts, ...(warning ? { warning } : {}) }, null, 2));
+    console.log(JSON.stringify({ devices, ...(warning ? { warning } : {}) }, null, 2));
     return;
   }
-  hosts.forEach(host => console.log(`${host.endpoint}  ${host.label} · ${host.kind} · ${host.reachable ? "reachable" : "unavailable"}`));
-  if (!hosts.length) console.log("(no reachable Hosts; connect Tailscale and keep Ox open with Allow Connections on in its active Profile)");
+  devices.forEach(device => console.log(`${device.endpoint}  ${device.label} · ${device.kind} · ${device.reachable ? "reachable" : "unavailable"}`));
+  if (!devices.length) console.log("(no reachable Profiles; connect Tailscale and keep Ox open with Allow Connections on in the active Profile)");
   if (warning) process.stderr.write(`${warning}\n`);
 }
 
-async function discoverSimulators(timeoutMs: number): Promise<HostCandidate[]> {
+async function discoverSimulators(timeoutMs: number): Promise<DeviceCandidate[]> {
   if (process.platform !== "darwin") return [];
   const options = { timeout: timeoutMs, maxBuffer: 1024 * 1024 };
   const { stdout } = await execute("xcrun", ["simctl", "list", "devices", "available", "--json"], options);
@@ -110,6 +110,6 @@ function normalizedEndpoint(value: string): string {
     const url = new URL(value);
     return url.pathname === "/" && !url.search && !url.hash ? `${url.protocol}//${url.host}` : url.toString();
   } catch {
-    return fail(`invalid Host endpoint: ${value}`);
+    return fail(`invalid Profile endpoint: ${value}`);
   }
 }

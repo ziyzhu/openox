@@ -1,6 +1,6 @@
 import type { SendConversationResult } from "@openox/protocol";
-import { connectHost, requireHost } from "./host-request.ts";
-import { HostRPCClient, type HostConversationRow } from "./host-rpc.ts";
+import { connectProfile, requireEndpoint } from "./profile-request.ts";
+import { ProfileRPCClient, type ConversationRow } from "./profile-rpc.ts";
 import {
   formatTokenCount,
   oneLine,
@@ -8,7 +8,7 @@ import {
   summarizeMessage,
   usageBreakdown,
   type ConversationSnapshot,
-} from "./host-snapshot.ts";
+} from "./profile-snapshot.ts";
 import { logs } from "./logs.ts";
 import { C, fail, terminalText, type CliContext, type SubCommand } from "./lib.ts";
 
@@ -21,7 +21,7 @@ type ConversationOptions = {
 };
 
 export const SUBS: Record<string, SubCommand> = {
-  list: { desc: "List conversations exposed by the selected Host (--json)", fn: listConversations },
+  list: { desc: "List conversations in the Profile (--json)", fn: listConversations },
   new: { desc: "Start a conversation and make it active, optionally temporary or on a chosen model", fn: newConversation },
   open: { desc: "Load a saved conversation and make it active (--conversation <id>)", fn: openConversation },
   respond: { desc: "Answer a pending choice or approval using its prompt id", fn: respondConversation },
@@ -29,20 +29,20 @@ export const SUBS: Record<string, SubCommand> = {
   stop: { desc: "Stop the selected conversation's running turn", fn: stopConversation },
   inspect: { desc: "Inspect the selected conversation's prompt, tools, messages, and blocks", fn: inspectConversation },
   watch: { desc: "Watch the selected conversation for changes, reconnecting between snapshots", fn: watchConversation },
-  logs: { desc: "Read Host logs that mention the conversation (--conversation <id>; same flags as host logs)", fn: conversationLogs },
+  logs: { desc: "Read Profile logs that mention the conversation (--conversation <id>; same flags as profile logs)", fn: conversationLogs },
 };
 
 
 async function listConversations(args: string[], context: CliContext): Promise<void> {
   const options = parseListOptions(args);
-  const host = new HostRPCClient(context.host);
-  let rows: HostConversationRow[];
+  const profile = new ProfileRPCClient(context.endpoint);
+  let rows: ConversationRow[];
   try {
-    rows = await host.listConversations(options.timeoutMs);
+    rows = await profile.listConversations(options.timeoutMs);
   } catch (error) {
     return fail((error as Error).message);
   } finally {
-    host.close();
+    profile.close();
   }
   rows = rows.filter(row => (!options.active || row.active)
     && (!options.search || `${row.title} ${row.id}`.toLowerCase().includes(options.search.toLowerCase())));
@@ -57,8 +57,8 @@ async function listConversations(args: string[], context: CliContext): Promise<v
 async function openConversation(args: string[], context: CliContext): Promise<void> {
   const options = parseListOptions(args, "open");
   if (!context.conversation) fail("conversation open requires --conversation <full-conversation-uuid>");
-  const result = await requireHost("conversations.open", context, options.timeoutMs);
-  const snapshot = (result.data as ConversationSnapshot | undefined) ?? fail("Host did not return the opened conversation");
+  const result = await requireEndpoint("conversations.open", context, options.timeoutMs);
+  const snapshot = (result.data as ConversationSnapshot | undefined) ?? fail("Ox did not return the opened conversation");
   if (options.json) console.log(JSON.stringify(snapshot, null, 2));
   else console.log(`opened ${snapshot.id}`);
 }
@@ -76,7 +76,7 @@ async function respondConversation(args: string[], context: CliContext): Promise
     else if (argument.startsWith("--timeout=")) timeoutMs = positiveNumber(argument.slice(10), "--timeout");
     else if (argument === "--json") json = true;
     else if (argument === "--help" || argument === "-h") {
-      console.log("Usage: ox [--host <url>] [--conversation <id>] conversation respond <answer | -> --prompt <prompt-id> [--json] [--timeout 30000]");
+      console.log("Usage: ox [--profile <ws-url>] [--conversation <id>] conversation respond <answer | -> --prompt <prompt-id> [--json] [--timeout 30000]");
       console.log("       Get the current prompt with conversation inspect --pending; stale responses are rejected.");
       return;
     } else if (argument.startsWith("--")) fail(`unknown option: ${argument}`);
@@ -84,7 +84,7 @@ async function respondConversation(args: string[], context: CliContext): Promise
   }
   const answer = words.join(" ") === "-" ? (await Bun.stdin.text()).trim() : words.join(" ");
   if (!promptId || !answer.trim()) fail("conversation respond requires an answer and --prompt <prompt-id>");
-  const result = await requireHost("conversations.respond", context, timeoutMs, { promptId, answer });
+  const result = await requireEndpoint("conversations.respond", context, timeoutMs, { promptId, answer });
   if (json) console.log(JSON.stringify(result, null, 2));
   else console.log(`responded ${result.promptId} (conversation ${result.conversationId}); use conversation watch to follow the run`);
 }
@@ -92,12 +92,12 @@ async function respondConversation(args: string[], context: CliContext): Promise
 async function newConversation(args: string[], context: CliContext): Promise<void> {
   const options = parseNewOptions(args);
   if (Boolean(options.provider) !== Boolean(options.model)) fail("conversation new requires --provider and --model together");
-  const result = await requireHost("conversations.new", context, options.timeoutMs, {
+  const result = await requireEndpoint("conversations.new", context, options.timeoutMs, {
     ...(options.temporary ? { temporary: true } : {}),
     ...(options.provider ? { providerId: options.provider, modelId: options.model } : {}),
     ...(options.agent ? { agentEndpoint: options.agent } : {}),
   });
-  if (options.attach.length) await requireHost("debug.conversations.attachServices", context, options.timeoutMs, { domains: options.attach });
+  if (options.attach.length) await requireEndpoint("debug.conversations.attachServices", context, options.timeoutMs, { domains: options.attach });
   if (options.json) console.log(JSON.stringify({ ...result, attached: options.attach }, null, 2));
   else console.log(result.conversationId);
 }
@@ -106,7 +106,7 @@ async function sendConversation(args: string[], context: CliContext): Promise<vo
   const options = parseSendOptions(args);
   const text = options.text === "-" ? (await Bun.stdin.text()).trim() : options.text;
   if (!text) fail("conversation send requires message text");
-  const result = await requireHost("conversations.send", context, options.timeoutMs, { text, wait: options.wait }) as SendConversationResult;
+  const result = await requireEndpoint("conversations.send", context, options.timeoutMs, { text, wait: options.wait }) as SendConversationResult;
   if (options.json) console.log(JSON.stringify(result, null, 2));
   else if (result.outcome === "completed") console.log(result.text ?? "");
   else if (result.outcome === "queued") console.log(result.conversationId);
@@ -120,7 +120,7 @@ async function sendConversation(args: string[], context: CliContext): Promise<vo
 
 async function stopConversation(args: string[], context: CliContext): Promise<void> {
   const options = parseListOptions(args, "stop");
-  const result = await requireHost("conversations.stop", context, options.timeoutMs);
+  const result = await requireEndpoint("conversations.stop", context, options.timeoutMs);
   if (options.json) console.log(JSON.stringify(result, null, 2));
   else console.log(result.wasRunning ? `stop requested ${result.conversationId}` : `idle ${result.conversationId}`);
 }
@@ -140,17 +140,17 @@ async function watchConversation(args: string[], context: CliContext): Promise<v
   const options = parseConversationOptions(args, true);
   let previous = "";
   let stopping = false;
-  const host = connectHost(context);
+  const profile = connectProfile(context);
   const stop = () => {
     stopping = true;
-    host.close();
+    profile.close();
   };
   process.on("SIGINT", stop);
   process.on("SIGTERM", stop);
   try {
     while (!stopping) {
       try {
-        const result = await host.request("conversations.get", options.timeoutMs);
+        const result = await profile.request("conversations.get", options.timeoutMs);
         if (stopping) break;
         const snapshot = (result.data ?? null) as ConversationSnapshot | null;
         const projected = projectSnapshot(snapshot, options.sections);
@@ -166,14 +166,14 @@ async function watchConversation(args: string[], context: CliContext): Promise<v
       if (!stopping) await Bun.sleep(options.intervalMs);
     }
   } finally {
-    host.close();
+    profile.close();
     process.off("SIGINT", stop);
     process.off("SIGTERM", stop);
   }
 }
 
 async function fetchSnapshot(context: CliContext, timeoutMs: number): Promise<ConversationSnapshot | null> {
-  const result = await requireHost("conversations.get", context, timeoutMs);
+  const result = await requireEndpoint("conversations.get", context, timeoutMs);
   return (result.data ?? null) as ConversationSnapshot | null;
 }
 
@@ -197,7 +197,7 @@ function parseListOptions(args: string[], command: "list" | "stop" | "open" = "l
     else if (argument === "-h" || argument === "--help") {
       const selection = command !== "list" ? " [--conversation <id>]" : "";
       const filters = command === "list" ? " [--active] [--search <text>] [--limit <count>]" : "";
-      console.log(`Usage: ox [--host <url>]${selection} conversation ${command}${filters} [--json] [--timeout 30000]`);
+      console.log(`Usage: ox [--profile <ws-url>]${selection} conversation ${command}${filters} [--json] [--timeout 30000]`);
       process.exit(0);
     } else fail(`unknown option: ${argument}`);
   }
@@ -227,9 +227,9 @@ function parseNewOptions(args: string[]): { timeoutMs: number; json: boolean; te
     else if (argument === "--timeout") timeoutMs = positiveNumber(args[++index], "--timeout");
     else if (argument.startsWith("--timeout=")) timeoutMs = positiveNumber(argument.slice(10), "--timeout");
     else if (argument === "-h" || argument === "--help") {
-      console.log("Usage: ox [--host <url>] conversation new [--temporary] [--agent <ws-url>] [--provider <id> --model <id>] [--attach <domain,...>] [--json] [--timeout 30000]");
-      console.log("       Prints the new conversation id; use ox host providers for provider and model ids.");
-      console.log("       --agent runs it on a remote agent added with ox host agents add; --provider/--model then pick that agent's model.");
+      console.log("Usage: ox [--profile <ws-url>] conversation new [--temporary] [--agent <ws-url>] [--provider <id> --model <id>] [--attach <domain,...>] [--json] [--timeout 30000]");
+      console.log("       Prints the new conversation id; use ox profile providers for provider and model ids.");
+      console.log("       --agent runs it on a remote agent added with ox profile agents add; --provider/--model then pick that agent's model.");
       process.exit(0);
     } else fail(`unknown option: ${argument}`);
   }
@@ -248,7 +248,7 @@ function parseSendOptions(args: string[]): { timeoutMs: number; json: boolean; w
     else if (argument === "--timeout") timeoutMs = positiveNumber(args[++index], "--timeout");
     else if (argument.startsWith("--timeout=")) timeoutMs = positiveNumber(argument.slice(10), "--timeout");
     else if (argument === "-h" || argument === "--help") {
-      console.log("Usage: ox [--host <url>] [--conversation <id>] conversation send <text | -> [--no-wait] [--json] [--timeout 600000]");
+      console.log("Usage: ox [--profile <ws-url>] [--conversation <id>] conversation send <text | -> [--no-wait] [--json] [--timeout 600000]");
       console.log("       Runs a real conversation turn with tools and services; - reads the message from stdin.");
       console.log("       Exits 1 when the turn fails, is cancelled, or needs a user response in Ox.");
       process.exit(0);
@@ -280,7 +280,7 @@ function parseConversationOptions(args: string[], watching: boolean): Conversati
     else if (argument === "-h" || argument === "--help") {
       const command = watching ? "watch" : "inspect";
       const interval = watching ? " [--interval 1000]" : "";
-      console.log(`Usage: ox [--host <url>] [--conversation <id>] conversation ${command} [--system|--tools|--messages|--blocks|--pending] [--full] [--json] [--timeout 30000]${interval}`);
+      console.log(`Usage: ox [--profile <ws-url>] [--conversation <id>] conversation ${command} [--system|--tools|--messages|--blocks|--pending] [--full] [--json] [--timeout 30000]${interval}`);
       process.exit(0);
     } else fail(`unknown option: ${argument}`);
   }
@@ -334,7 +334,7 @@ function sorted(value: unknown): unknown {
   return value;
 }
 
-function printConversations(conversations: HostConversationRow[]): void {
+function printConversations(conversations: ConversationRow[]): void {
   if (!conversations.length) {
     console.log("(no conversations)");
     return;

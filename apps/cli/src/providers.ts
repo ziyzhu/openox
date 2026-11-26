@@ -1,10 +1,10 @@
-import { requireHost } from "./host-request.ts";
-import { type ProviderEntry } from "./host-snapshot.ts";
+import { requireEndpoint } from "./profile-request.ts";
+import { type ProviderEntry } from "./profile-snapshot.ts";
 import { C, fail, terminalText, type CliContext } from "./lib.ts";
 
 export async function providers(args: string[], context: CliContext): Promise<void> {
   const options = parseOptions(args);
-  const result = await requireHost("providers.list", context, options.timeoutMs);
+  const result = await requireEndpoint("providers.list", context, options.timeoutMs);
   const providers = Array.isArray(result.providers) ? result.providers as ProviderEntry[] : [];
   if (options.json) {
     console.log(JSON.stringify(providers, null, 2));
@@ -22,7 +22,7 @@ function parseOptions(args: string[]): { timeoutMs: number; json: boolean } {
     else if (argument === "--timeout") timeoutMs = positiveNumber(args[++index], "--timeout");
     else if (argument.startsWith("--timeout=")) timeoutMs = positiveNumber(argument.slice(10), "--timeout");
     else if (argument === "-h" || argument === "--help") {
-      console.log("Usage: ox [--host <url>] host providers [--json] [--timeout 30000]");
+      console.log("Usage: ox [--profile <ws-url>] profile providers [--json] [--timeout 30000]");
       process.exit(0);
     } else fail(`unknown option: ${argument}`);
   }

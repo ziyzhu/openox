@@ -32,20 +32,21 @@ export const fail = (message: string): never => {
   process.exit(1);
 };
 
-export type CliContext = { host?: string; profile?: string; conversation?: string; repository?: string };
+export type CliContext = { endpoint?: string; profile?: string; conversation?: string; repository?: string };
 export type SubCommand = { fn: (args: string[], context: CliContext) => Promise<void>; desc: string };
 export type CommandGroup = {
   fn: (args: string[], context: CliContext) => Promise<void> | void;
   desc: string;
   subs?: Record<string, { desc: string }>;
+  hidden?: boolean;
 };
 
 function printUsage(program: string, description: string, groups: Record<string, CommandGroup>): void {
   console.log(terminalText(CLI_LOGO, [C.bold, C.harvest]));
   console.log(`${description}\n`);
-  console.log(`Usage: ${program} [--host <ws-url>] [--conversation <conversation-id>] [--profile <id-or-path>] [--repository <path-or-url>] <command> [...flags] [...args]\n`);
+  console.log(`Usage: ${program} [--profile <ws-url-or-path>] [--conversation <conversation-id>] [--repository <path-or-url>] <command> [...flags] [...args]\n`);
   console.log("Commands:");
-  const rows = Object.entries(groups).flatMap(([name, group]) => {
+  const rows = Object.entries(groups).filter(([, group]) => !group.hidden).flatMap(([name, group]) => {
     const subs = Object.entries(group.subs ?? {});
     return subs.length
       ? subs.map(([sub, command]) => ({ command: `${name} ${sub}`, description: command.desc }))
@@ -58,9 +59,8 @@ function printUsage(program: string, description: string, groups: Record<string,
   }
   console.log("\nFlags:");
   const flags = [
-    ["--host <ws-url>", "WebSocket address of a device running Ox"],
-    ["--conversation <conversation-id>", "Conversation-bound VM on the Host"],
-    ["--profile <id-or-path>", "Host Profile ID with --host, or directory for disk inspection"],
+    ["--profile <ws-url-or-path>", "A Profile open in Ox (ws://device:9876, or OX_PROFILE_ENDPOINT), or a Profile folder on disk"],
+    ["--conversation <conversation-id>", "Conversation-bound VM in the Profile"],
     ["--repository <origin>", "Repository path or Git URL"],
     ["-v, --version", "Display the installed version and exit"],
     ["-h, --help", "Display this menu and exit"],
@@ -74,13 +74,13 @@ function printUsage(program: string, description: string, groups: Record<string,
 
 export function parseGlobalOptions(args: string[]): { context: CliContext; rest: string[] } {
   const options = new Map<string, { key: keyof CliContext; requirement: string }>([
-    ["--host", { key: "host", requirement: "a WebSocket URL" }],
-    ["--profile", { key: "profile", requirement: "a Profile ID or path" }],
+    ["--host", { key: "endpoint", requirement: "a WebSocket URL" }],
+    ["--profile", { key: "profile", requirement: "a WebSocket URL or a Profile path" }],
     ["--conversation", { key: "conversation", requirement: "a conversation id" }],
     ["--repository", { key: "repository", requirement: "a path or URL" }],
   ]);
   const removedOptions = new Map([
-    ["--runtime", "--runtime was removed; the selected Host owns service page implementation"],
+    ["--runtime", "--runtime was removed; Ox owns service page implementation"],
     ["--vm-session", "--vm-session was renamed to --conversation"],
     ["--root", "--root was renamed to --profile"],
   ]);
@@ -103,8 +103,11 @@ export function parseGlobalOptions(args: string[]): { context: CliContext; rest:
     if (!value || (assignment === -1 && value.startsWith("-"))) {
       throw new Error(`${flag} requires ${option.requirement}`);
     }
+    const key = option.key === "profile" && /^wss?:\/\//i.test(value) ? "endpoint" : option.key;
+    if (seen.has(key)) throw new Error(`${flag} conflicts with another Profile address`);
     seen.add(option.key);
-    context[option.key] = value;
+    seen.add(key);
+    context[key] = value;
   }
   return { context, rest };
 }
@@ -163,9 +166,9 @@ const MOVED_COMMANDS: Record<string, string> = {
   memory: "ox profile memory",
   skills: "ox profile skills, ox repository skills, or ox vm skills",
   artifacts: "ox profile files",
-  discover: "ox host list",
-  logs: "ox host logs",
-  providers: "ox host providers",
+  discover: "ox profile discover",
+  logs: "ox profile logs",
+  providers: "ox profile providers",
 };
 
 function validateContext(command: string, subcommand: string | undefined, context: CliContext): void {
@@ -177,12 +180,12 @@ function validateContext(command: string, subcommand: string | undefined, contex
   if (context.conversation && command === "conversation" && (subcommand === "list" || subcommand === "new")) {
     throw new Error(`--conversation does not apply to ox conversation ${subcommand}`);
   }
-  if (context.profile && command !== "profile" && command !== "files") throw new Error("--profile applies only to ox profile and ox files");
+  if (context.profile && command !== "profile") throw new Error("--profile <path> applies only to ox profile; use --profile <ws-url> for a Profile open in Ox");
   if (context.repository && command !== "repository") throw new Error("--repository applies only to ox repository");
-  const hostRepositoryAction = command === "repository" && ["list", "connect", "disconnect"].includes(subcommand ?? "");
-  if (context.repository && hostRepositoryAction) throw new Error(`--repository does not apply to ox repository ${subcommand}; use --host`);
-  const usesHost = ["host", "conversation", "vm", "profile", "files", "service"].includes(command) || hostRepositoryAction;
-  if (context.host && !usesHost) throw new Error("--host applies only to ox host, ox profile, ox files, ox service, ox conversation, ox vm, and ox repository list|connect|disconnect");
+  const profileRepositoryAction = command === "repository" && ["list", "connect", "disconnect"].includes(subcommand ?? "");
+  if (context.repository && profileRepositoryAction) throw new Error(`--repository does not apply to ox repository ${subcommand}; use --profile <ws-url>`);
+  const usesEndpoint = ["host", "conversation", "vm", "profile", "files", "service"].includes(command) || profileRepositoryAction;
+  if (context.endpoint && !usesEndpoint) throw new Error("--profile <ws-url> applies only to ox profile, ox files, ox service, ox conversation, ox vm, and ox repository list|connect|disconnect");
 }
 
 export function group(name: string, desc: string, subs: Record<string, SubCommand>): CommandGroup {

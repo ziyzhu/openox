@@ -1,4 +1,4 @@
-import { connectHost, requireHost } from "./host-request.ts";
+import { connectProfile, requireEndpoint } from "./profile-request.ts";
 import { fail, type CliContext } from "./lib.ts";
 
 type LogRow = {
@@ -27,12 +27,12 @@ export async function logs(args: string[], context: CliContext): Promise<void> {
     let hasMore = false;
     let count = 0;
     do {
-      const result = await requireHost("logs.list", context, options.timeoutMs, logParams(options, cursor));
+      const result = await requireEndpoint("logs.list", context, options.timeoutMs, logParams(options, cursor));
       if ((options.page || options.all || options.tail > options.limit && Number.isFinite(options.tail))
-          && typeof result.hasMore !== "boolean") fail("Host does not support log pagination; update Ox on the Host device");
+          && typeof result.hasMore !== "boolean") fail("Ox does not support log pagination; update Ox on the device");
       nextCursor = typeof result.nextCursor === "string" ? result.nextCursor : undefined;
       hasMore = result.hasMore === true;
-      if (hasMore && (!nextCursor || cursors.has(nextCursor))) fail("Host returned an invalid log pagination cursor");
+      if (hasMore && (!nextCursor || cursors.has(nextCursor))) fail("Ox returned an invalid log pagination cursor");
       const rows = typeof result.hasMore === "boolean" ? result.logs as LogRow[]
         : filteredRows(result.logs, options.level, options.grep, options.category, options.since);
       pages.push(rows);
@@ -69,17 +69,17 @@ async function followLogs(
 ): Promise<void> {
   let previous: Map<string, number> | undefined;
   let stopping = false;
-  const host = connectHost(context);
+  const profile = connectProfile(context);
   const stop = () => {
     stopping = true;
-    host.close();
+    profile.close();
   };
   process.on("SIGINT", stop);
   process.on("SIGTERM", stop);
   try {
     while (!stopping) {
       try {
-        const result = await host.request("logs.list", options.timeoutMs, logParams(options));
+        const result = await profile.request("logs.list", options.timeoutMs, logParams(options));
         if (stopping) break;
         const allRows = Array.isArray(result.logs) ? result.logs as LogRow[] : [];
         // Sequence numbers are snapshot-relative in a compacting file. Match
@@ -102,7 +102,7 @@ async function followLogs(
       if (!stopping) await Bun.sleep(options.intervalMs);
     }
   } finally {
-    host.close();
+    profile.close();
     process.off("SIGINT", stop);
     process.off("SIGTERM", stop);
   }
@@ -164,7 +164,7 @@ function parseOptions(args: string[]): {
     else if (argument === "--interval") intervalMs = positiveNumber(args[++index], "--interval");
     else if (argument.startsWith("--interval=")) intervalMs = positiveNumber(argument.slice(11), "--interval");
     else if (argument === "-h" || argument === "--help") {
-      console.log(`Usage: ox [--host <url>] host logs [--level ${LEVELS.join("|")}] [--grep <substring>] [--category <name>] [--since <ISO-8601>] [--tail <count>] [--limit 1..2000] [--page | --cursor <token> | --all | --follow] [--summary] [--json] [--timeout 30000] [--interval 1000]`);
+      console.log(`Usage: ox [--profile <ws-url>] profile logs [--level ${LEVELS.join("|")}] [--grep <substring>] [--category <name>] [--since <ISO-8601>] [--tail <count>] [--limit 1..2000] [--page | --cursor <token> | --all | --follow] [--summary] [--json] [--timeout 30000] [--interval 1000]`);
       process.exit(0);
     } else fail(`unknown option: ${argument}`);
   }

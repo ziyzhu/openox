@@ -4,12 +4,12 @@ import { join } from "node:path";
 export const BRIDGE_ENVIRONMENT = "OX_AGENT_BRIDGE";
 export const ORIGIN_ENVIRONMENT = "OX_AGENT_ORIGIN";
 export const ORIGIN_ENTRY = "ox.origin";
-export const HOST_UNAVAILABLE = "Ox Host is unavailable";
+export const OX_UNAVAILABLE = "Ox is unavailable";
 
 const SOURCE = String.raw`
 const bridge = process.env.OX_AGENT_BRIDGE;
 const origin = process.env.OX_AGENT_ORIGIN;
-const unavailable = "Ox Host is unavailable";
+const unavailable = "Ox is unavailable";
 
 export default async function oxExtension(pi) {
   if (!bridge) return;
@@ -33,7 +33,7 @@ export default async function oxExtension(pi) {
       label: tool.name,
       description: tool.description,
       parameters: tool.parameters,
-      execute: (toolCallId, args, signal, onUpdate) => callHost(tool.name, toolCallId, args, signal, onUpdate),
+      execute: (toolCallId, args, signal, onUpdate) => callProfile(tool.name, toolCallId, args, signal, onUpdate),
     });
   }
 
@@ -51,7 +51,7 @@ export default async function oxExtension(pi) {
   });
 }
 
-async function callHost(name, toolCallId, args, signal, onUpdate) {
+async function callProfile(name, toolCallId, args, signal, onUpdate) {
   let response;
   try {
     response = await fetch(bridge + "/tools/call", {

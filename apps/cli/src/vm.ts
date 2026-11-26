@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { Value } from "typebox/value";
 import { VMParamsSchemas, VMResultSchema } from "./vm-protocol.ts";
-import { callHost } from "./host-rpc.ts";
+import { callProfile } from "./profile-rpc.ts";
 import { fail, terminalText, C, type CliContext, type SubCommand } from "./lib.ts";
 
 type VMResult = {
@@ -10,7 +10,7 @@ type VMResult = {
 };
 
 export const SUBS: Record<string, SubCommand> = {
-  inspect: { desc: "Inspect the selected Host, conversation-bound VM, and VFS roots (--json)", fn: inspect },
+  inspect: { desc: "Inspect the runtime, conversation-bound VM, and VFS roots (--json)", fn: inspect },
   functions: { desc: "List the ox.* functions exposed by the VM (--json)", fn: functions },
   help: { desc: "Print the complete contract for one ox.* function", fn: help },
   call: { desc: "Call one ox.* function with structured JSON arguments", fn: call },
@@ -31,7 +31,7 @@ async function inspect(args: string[], context: CliContext): Promise<void> {
   const host = object(value.host);
   const runtime = object(value.vm);
   const conversation = value.session === null ? undefined : object(value.session);
-  console.log(`${terminalText("Host", [C.sky])}       ${host.kind ?? "unknown"} ${host.mode ?? ""} via ${host.transport ?? "unknown"}`.trimEnd());
+  console.log(`${terminalText("Runtime", [C.sky])}    ${host.kind ?? "unknown"} ${host.mode ?? ""} via ${host.transport ?? "unknown"}`.trimEnd());
   console.log(`${terminalText("VM", [C.sky])}         ${runtime.contract ?? "unknown"} on ${runtime.engine ?? "unknown"}`);
   console.log(`${terminalText("Lifetime", [C.sky])}   ${runtime.lifetime ?? "unknown"}; ${runtime.sessionBinding ?? "unknown"}-bound execution`);
   console.log(`${terminalText("Conversation", [C.sky])}       ${conversation?.id ?? "none"}${conversation?.temporary === true ? " (temporary)" : ""}`);
@@ -66,7 +66,7 @@ async function help(args: string[], context: CliContext): Promise<void> {
     console.log(JSON.stringify(value, null, 2));
     return;
   }
-  if (typeof value.help !== "string") fail("VM Host returned invalid function help");
+  if (typeof value.help !== "string") fail("Ox returned invalid VM function help");
   console.log(value.help);
 }
 
@@ -167,8 +167,8 @@ async function request(
     ...fields,
   };
   if (!Value.Check(VMParamsSchemas[method], params)) fail(`invalid ${method} parameters`);
-  const result = await callHost(method, params, timeoutMs, context.host);
-  if (!Value.Check(VMResultSchema, result)) fail(`Host returned an invalid ${method} result`);
+  const result = await callProfile(method, params, timeoutMs, context.endpoint);
+  if (!Value.Check(VMResultSchema, result)) fail(`Ox returned an invalid ${method} result`);
   return result;
 }
 
@@ -193,7 +193,7 @@ function printVMJSON(result: VMResult): void {
 
 function printHelp(args: string[], usage: string): boolean {
   if (!args.includes("--help") && !args.includes("-h")) return false;
-  console.log(`Usage: ox [--host <url>] [--conversation <id>] vm ${usage}`);
+  console.log(`Usage: ox [--profile <ws-url>] [--conversation <id>] vm ${usage}`);
   return true;
 }
 

@@ -23,7 +23,6 @@ export const Schemas = {
   DurableCommandParameters: object("DurableCommandParameters", { caseID: S(), action: S() }),
   DurableCommandResult: opaque("DurableCommandResult", "Experimental cache-only Pi Durable command result."),
   ProfileRequest: object("ProfileRequest", { profileId: S({ minLength: 36, maxLength: 36 }) }),
-  CreateProfileRequest: object("CreateProfileRequest", { name: S({ minLength: 1, maxLength: 100 }) }),
   UpdateProfileRequest: object("UpdateProfileRequest", {
     profileId: S({ minLength: 36, maxLength: 36 }), name: nullable(S({ minLength: 1, maxLength: 100 })),
     memory: nullable(S({ maxLength: 524288 })), soul: nullable(S({ maxLength: 204800 })),
@@ -78,7 +77,6 @@ export const Schemas = {
   Message: opaque("Message", "Existing tagged Agent Message Codable payload."),
   Block: opaque("Block", "Existing transcript Block Codable payload."),
   ProfileRow: object("ProfileRow", { id: S(), name: S(), location: S(), version: S(), active: B() }),
-  ListProfilesResult: object("ListProfilesResult", { profiles: A(R("ProfileRow")) }),
   ProfileResult: object("ProfileResult", { profile: R("ProfileRow"), memory: optional(S()), soul: optional(S()) }),
   FolderGrantRow: object("FolderGrantRow", { id: S(), name: S() }),
   ListFolderGrantsResult: object("ListFolderGrantsResult", { folders: A(R("FolderGrantRow")), unassignedFolders: optional(A(R("FolderGrantRow"))) }),
@@ -91,7 +89,7 @@ export const Schemas = {
   ListRepositoriesResult: object("ListRepositoriesResult", { repositories: A(R("RepositoryRow")) }),
   RepositoryResult: object("RepositoryResult", { repository: R("RepositoryRow") }),
   EmptyResult: object("EmptyResult", {}),
-  HostDescription: object("HostDescription", {
+  ProfileDescription: object("ProfileDescription", {
     implementation: Type.Object({ name: S(), version: S(), build: S() }),
     device: Type.Optional(Type.Object({ name: S() }, { description: "The device this Ox app runs on." })),
     profile: Type.Optional(Type.Object({ id: S(), name: S() }, { description: "The Profile active on this device; Clients open it." })),
@@ -167,11 +165,9 @@ export const Schemas = {
 type SchemaName = keyof typeof Schemas;
 const method = (swiftCase: string, params: SchemaName, result: SchemaName) => ({ swiftCase, params, result });
 export const Methods = {
-  "host.describe": method("describe", "EmptyRequest", "HostDescription"),
-  "profiles.list": method("listProfiles", "EmptyRequest", "ListProfilesResult"),
+  "profile.describe": method("describe", "EmptyRequest", "ProfileDescription"),
+  "host.describe": method("legacyDescribe", "EmptyRequest", "ProfileDescription"),
   "profiles.inspect": method("inspectProfile", "ProfileRequest", "ProfileResult"),
-  "profiles.create": method("createProfile", "CreateProfileRequest", "ProfileResult"),
-  "profiles.select": method("selectProfile", "ProfileRequest", "ProfileResult"),
   "profiles.update": method("updateProfile", "UpdateProfileRequest", "ProfileResult"),
   "files.list": method("listFolderGrants", "FolderProfileRequest", "ListFolderGrantsResult"),
   "files.mount": method("mountFolder", "FolderProfileRequest", "FolderGrantResult"),
@@ -237,7 +233,9 @@ export const RequestBatchSchema = A(RequestSchema, { $id: "RequestBatch", minIte
 export const ResponseBatchSchema = A(ResponseSchema, { $id: "ResponseBatch", minItems: 1 });
 
 export type MethodName = keyof typeof Methods;
-export type HostDescription = Static<typeof Schemas.HostDescription>;
-export type HostConversationRow = Static<typeof Schemas.ConversationRow>;
+export type ProfileDescription = Static<typeof Schemas.ProfileDescription>;
+export type ConversationRow = Static<typeof Schemas.ConversationRow>;
+export type HostDescription = ProfileDescription;
+export type HostConversationRow = ConversationRow;
 export type SendConversationResult = Static<typeof Schemas.SendConversationResult>;
 export type ConversationOutcome = SendConversationResult["outcome"];

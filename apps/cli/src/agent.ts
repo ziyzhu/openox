@@ -13,7 +13,7 @@ import { fail, type SubCommand } from "./lib.ts";
 const SERVE_USAGE = `Usage: ox agent serve [--port ${AGENT_DEFAULT_PORT}] [--local] [--allow-sleep] [--approve | --no-approve]
 
 Publishes wss://<this machine>.ts.net:<port> through Tailscale Serve to this machine's owner by default.
-Conversations start in your home folder unless a Host names another folder.
+Conversations start in your home folder unless Ox names another folder.
   --local               Loopback only at ws://127.0.0.1:<port>; do not publish through Tailscale
   --allow-sleep         Let macOS idle-sleep while serving`;
 const DESCRIBE_USAGE = `Usage: ox agent describe [--endpoint ws://127.0.0.1:${AGENT_DEFAULT_PORT}] [--json]`;

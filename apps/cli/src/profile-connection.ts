@@ -1,16 +1,18 @@
 import { validateResponse } from "@openox/protocol";
 
-export const DEFAULT_HOST_PORT = 9876;
-const DEFAULT_ENDPOINT = `ws://127.0.0.1:${DEFAULT_HOST_PORT}`;
+export const DEFAULT_PORT = 9876;
+const DEFAULT_ENDPOINT = `ws://127.0.0.1:${DEFAULT_PORT}`;
 
-export function hostEndpoint(value = process.env.OX_HOST_ENDPOINT ?? process.env.OX_DEBUG_ENDPOINT ?? DEFAULT_ENDPOINT): string {
+export const ENVIRONMENT_ENDPOINT = process.env.OX_PROFILE_ENDPOINT ?? process.env.OX_HOST_ENDPOINT;
+
+export function profileEndpoint(value = ENVIRONMENT_ENDPOINT ?? process.env.OX_DEBUG_ENDPOINT ?? DEFAULT_ENDPOINT): string {
   const url = new URL(value);
   if (!["ws:", "wss:"].includes(url.protocol)) throw new Error("Ox endpoint must be a ws:// or wss:// URL");
-  if (url.protocol === "ws:" && !url.port) url.port = String(DEFAULT_HOST_PORT);
+  if (url.protocol === "ws:" && !url.port) url.port = String(DEFAULT_PORT);
   return url.toString();
 }
 
-export class HostRPCError extends Error {
+export class ProfileRPCError extends Error {
   readonly code?: number;
   readonly data?: unknown;
 
@@ -18,11 +20,11 @@ export class HostRPCError extends Error {
     super(message);
     this.code = code;
     this.data = data;
-    this.name = "HostRPCError";
+    this.name = "ProfileRPCError";
   }
 }
 
-export class HostConnection {
+export class ProfileConnection {
   private socket?: WebSocket;
   private disposed = false;
   private connectionGeneration = 0;
@@ -39,7 +41,7 @@ export class HostConnection {
   private readonly endpoint: string;
 
   constructor(endpoint?: string) {
-    this.endpoint = hostEndpoint(endpoint);
+    this.endpoint = profileEndpoint(endpoint);
   }
 
   request(method: string, params: Record<string, unknown>, timeoutMs: number): Promise<unknown> {
@@ -58,7 +60,7 @@ export class HostConnection {
           this.pending.get(request.id)!.sent = true;
         }
       } catch (error) {
-        this.disconnect(`Host connection failed: ${(error as Error).message}`);
+        this.disconnect(`Ox connection failed: ${(error as Error).message}`);
       }
     });
   }
@@ -80,13 +82,13 @@ export class HostConnection {
           pending.sent = true;
         }
       }
-      catch { this.disconnect("Host request could not be sent"); }
+      catch { this.disconnect("Ox request could not be sent"); }
     };
     socket.onerror = () => {
-      if (this.socket === socket) this.disconnect("Host connection failed");
+      if (this.socket === socket) this.disconnect("Ox connection failed");
     };
     socket.onclose = () => {
-      if (this.socket === socket) this.disconnect("Host connection closed before response");
+      if (this.socket === socket) this.disconnect("Ox connection closed before response");
     };
     socket.onmessage = event => {
       if (this.socket === socket) this.receive(event);
@@ -99,24 +101,24 @@ export class HostConnection {
     try {
       message = JSON.parse(typeof event.data === "string" ? event.data : new TextDecoder().decode(event.data as ArrayBuffer));
     } catch {
-      this.disconnect("Host returned malformed JSON");
+      this.disconnect("Ox returned malformed JSON");
       return;
     }
     if (!isObject(message) || message.jsonrpc !== "2.0") {
-      this.disconnect("Host returned an invalid JSON-RPC response; update the Host and CLI together");
+      this.disconnect("Ox returned an invalid JSON-RPC response; update Ox and the CLI together");
       return;
     }
     if (!("id" in message) && typeof message.method === "string") return;
     if (typeof message.id !== "string") {
-      this.disconnect("Host returned a response without a matching request ID");
+      this.disconnect("Ox returned a response without a matching request ID");
       return;
     }
     this.finish(message.id, pending => {
-      if (!validateResponse(message)) pending.reject(requestFailure("Host returned an invalid JSON-RPC response", pending.sent));
+      if (!validateResponse(message)) pending.reject(requestFailure("Ox returned an invalid JSON-RPC response", pending.sent));
       else if (Object.hasOwn(message, "result")) pending.resolve(message.result);
       else {
         const error = message.error as { code: number; message: string; data?: unknown };
-        pending.reject(new HostRPCError(error.message, error.code, error.data));
+        pending.reject(new ProfileRPCError(error.message, error.code, error.data));
       }
     });
   }

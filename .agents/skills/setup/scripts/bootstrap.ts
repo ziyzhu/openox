@@ -1,5 +1,5 @@
 import { basename, dirname, isAbsolute, resolve } from "node:path";
-import { callHost } from "../../../../apps/cli/src/host-rpc.ts";
+import { callProfile } from "../../../../apps/cli/src/profile-rpc.ts";
 import { ROOT, run } from "../../../lib.ts";
 import { qaCommand, qaConfig } from "./qa-config.ts";
 import { launchTemplate } from "./template.ts";
@@ -124,7 +124,7 @@ async function requireBooted(requested: string[]): Promise<void> {
 }
 
 async function simulatorRegion(endpoint: string): Promise<LLMRegion> {
-  const { region } = await callHost("providers.list", {}, 10_000, endpoint);
+  const { region } = await callProfile("providers.list", {}, 10_000, endpoint);
   if (region !== "global" && region !== "china") throw new Error("simulator region lookup returned an invalid result");
   return region;
 }
@@ -157,15 +157,15 @@ async function bootstrap(): Promise<void> {
   if (missing.length > 0) throw new Error(`missing API keys for ${missing.join(", ")}`);
 
   if (source) {
-    const exported = await callHost("debug.websiteData.export", {}, 60_000, source.debugEndpoint);
+    const exported = await callProfile("debug.websiteData.export", {}, 60_000, source.debugEndpoint);
     if (typeof exported.data !== "string" || typeof exported.bytes !== "number") {
       throw new Error("website data export returned an invalid result");
     }
-    await callHost("debug.websiteData.restore", { data: exported.data }, 60_000, target.debugEndpoint);
+    await callProfile("debug.websiteData.restore", { data: exported.data }, 60_000, target.debugEndpoint);
     console.log(`Website data: restored ${exported.bytes} bytes from ${source.device}`);
   }
   if (artifacts.length > 0) {
-    const result = await callHost("debug.artifacts.bootstrap", {
+    const result = await callProfile("debug.artifacts.bootstrap", {
       artifacts: artifacts.map(({ name, data }) => ({ name, data })),
     }, 60_000, target.debugEndpoint);
     const installed = result.artifacts as string[] | undefined;
@@ -173,7 +173,7 @@ async function bootstrap(): Promise<void> {
     artifacts.forEach((artifact, index) => console.log(`FileItem ${artifact.path} -> ${installed[index]} (${artifact.bytes} bytes)`));
   }
   for (const { providerId, key } of credentials) {
-    await callHost("debug.providers.setKey", { providerId, key, region }, 10_000, target.debugEndpoint);
+    await callProfile("debug.providers.setKey", { providerId, key, region }, 10_000, target.debugEndpoint);
     console.log(`Provider ${providerId}: ready`);
   }
   console.log(`BOOTSTRAPPED ${target.device} region=${region ?? "none"} providers=${credentials.length}`);

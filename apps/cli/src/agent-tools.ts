@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Value } from "typebox/value";
 import { AgentSchemas, type AgentContext, type AgentTool, type AgentToolCallResult } from "@openox/protocol/agent";
-import { HOST_UNAVAILABLE } from "./agent-pi-extension.ts";
+import { OX_UNAVAILABLE } from "./agent-pi-extension.ts";
 import { agentLog } from "./agent-log.ts";
 import type { AgentSocket } from "./agent-serve.ts";
 
@@ -19,7 +19,7 @@ type ToolCall = {
 
 const KEEPALIVE_MS = 15000;
 const encoder = new TextEncoder();
-const unavailable: AgentToolCallResult = { content: [{ type: "text", text: HOST_UNAVAILABLE }], isError: true };
+const unavailable: AgentToolCallResult = { content: [{ type: "text", text: OX_UNAVAILABLE }], isError: true };
 
 export class ToolBridge {
   private server?: ReturnType<typeof Bun.serve>;
@@ -55,7 +55,7 @@ export class ToolBridge {
     const error = message.error as { message?: unknown } | undefined;
     if (error) this.finish(id, { content: [{ type: "text", text: String(error.message ?? "Tool call failed") }], isError: true }, "error");
     else if (!Value.Check(AgentSchemas, AgentSchemas.AgentToolCallResult, message.result)) {
-      this.finish(id, { content: [{ type: "text", text: "Ox Host returned an invalid tool result" }], isError: true }, "error");
+      this.finish(id, { content: [{ type: "text", text: "Ox returned an invalid tool result" }], isError: true }, "error");
     } else {
       const result = message.result as AgentToolCallResult;
       this.finish(id, result, result.isError ? "error" : "ok");

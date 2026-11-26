@@ -34,10 +34,7 @@ enum ProfileProtocol {
         let conversations = runtime.conversations
         let services = runtime.services
         switch method {
-        case .listProfiles: handleListProfiles(try decode(EmptyRequest.self), runtime: runtime, reply: reply)
         case .inspectProfile: handleInspectProfile(try decode(ProfileRequest.self), runtime: runtime, reply: reply)
-        case .createProfile: handleCreateProfile(try decode(CreateProfileRequest.self), runtime: runtime, reply: reply)
-        case .selectProfile: handleSelectProfile(try decode(ProfileRequest.self), runtime: runtime, reply: reply)
         case .updateProfile: handleUpdateProfile(try decode(UpdateProfileRequest.self), runtime: runtime, reply: reply)
         case .listFolderGrants: handleListFolderGrants(try decode(FolderProfileRequest.self), runtime: runtime, reply: reply)
         case .mountFolder: handleMountFolder(try decode(FolderProfileRequest.self), runtime: runtime, reply: reply)
@@ -51,7 +48,7 @@ enum ProfileProtocol {
         case .disconnectRepositoryFolder: handleDisconnectRepositoryFolder(try decode(RepositoryIDRequest.self), runtime: runtime, reply: reply)
         case .durableStorage, .durableConversation:
             try handleDurableExperiment(method, params: params, conversations: conversations, reply: reply)
-        case .describe:
+        case .describe, .legacyDescribe:
             _ = try decode(EmptyRequest.self)
             reply.success(ProfileRPC.description)
         case .invokeAction: handleInvokeAction(try decode(ActionRequest.self), conversationManager: conversations, serviceManager: services, reply: reply)

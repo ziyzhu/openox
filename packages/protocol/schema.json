@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "urn:openox:host-rpc:4",
-  "title": "OpenOx Host JSON-RPC messages",
+  "title": "OpenOx Profile JSON-RPC messages",
   "anyOf": [
     {
       "$ref": "#/definitions/Request"
@@ -54,20 +54,6 @@
           "type": "string",
           "minLength": 36,
           "maxLength": 36
-        }
-      },
-      "additionalProperties": true
-    },
-    "CreateProfileRequest": {
-      "type": "object",
-      "required": [
-        "name"
-      ],
-      "properties": {
-        "name": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 100
         }
       },
       "additionalProperties": true
@@ -859,21 +845,6 @@
       },
       "additionalProperties": true
     },
-    "ListProfilesResult": {
-      "type": "object",
-      "required": [
-        "profiles"
-      ],
-      "properties": {
-        "profiles": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/ProfileRow"
-          }
-        }
-      },
-      "additionalProperties": true
-    },
     "ProfileResult": {
       "type": "object",
       "required": [
@@ -1034,7 +1005,7 @@
       "properties": {},
       "additionalProperties": true
     },
-    "HostDescription": {
+    "ProfileDescription": {
       "type": "object",
       "required": [
         "implementation",

@@ -8,7 +8,7 @@ export function isMethod(method: string): method is MethodName {
   return Object.hasOwn(Methods, method);
 }
 
-// Unknown methods remain available to newer or extended Hosts; discovery is separate.
+// Unknown methods remain available to newer or extended Ox apps; discovery is separate.
 export function validateParams(method: string, params: unknown): boolean {
   if (!isMethod(method)) return true;
   const normalized = params === undefined || (Array.isArray(params) && params.length === 0) ? {} : params;

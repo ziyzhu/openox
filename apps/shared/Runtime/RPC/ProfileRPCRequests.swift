@@ -4,11 +4,9 @@ extension ProfileProtocol {
     static let contractVersion = 4
 
     enum Method: String, CaseIterable {
-        case describe = "host.describe"
-        case listProfiles = "profiles.list"
+        case describe = "profile.describe"
+        case legacyDescribe = "host.describe"
         case inspectProfile = "profiles.inspect"
-        case createProfile = "profiles.create"
-        case selectProfile = "profiles.select"
         case updateProfile = "profiles.update"
         case listFolderGrants = "files.list"
         case mountFolder = "files.mount"
@@ -64,10 +62,6 @@ extension ProfileProtocol {
 
     struct ProfileRequest: Decodable {
         let profileId: String
-    }
-
-    struct CreateProfileRequest: Decodable {
-        let name: String
     }
 
     struct UpdateProfileRequest: Decodable {

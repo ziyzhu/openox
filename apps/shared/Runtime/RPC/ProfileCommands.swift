@@ -28,9 +28,9 @@ enum ProfileCommands {
     }
 
     static func profile(_ id: String) throws -> Profile {
-        guard let uuid = UUID(uuidString: id),
-              let profile = StorageRoot.shared.profiles.first(where: { $0.id == uuid }) else {
-            throw RuntimeError.bridge("Unknown Profile: \(id)")
+        guard let uuid = UUID(uuidString: id), uuid == StorageRoot.shared.activeId,
+              let profile = StorageRoot.shared.active else {
+            throw RuntimeError.bridge("Only the Profile this connection opened is available: \(id)")
         }
         return profile
     }
@@ -60,46 +60,15 @@ enum ProfileCommands {
         guard !runtime.conversations.activities.values.contains(where: {
             if case .running = $0 { return true }
             return false
-        }) else { throw RuntimeError.bridge("Stop running conversations before updating or selecting a Profile") }
+        }) else { throw RuntimeError.bridge("Stop running conversations before updating the Profile") }
     }
 }
 
 extension ProfileProtocol {
     @MainActor
-    static func handleListProfiles(_ command: EmptyRequest, runtime: any ProfileRuntime, reply: ProfileRPC.Reply) {
-        ProfileCommands.perform("list", runtime: runtime, reply: reply) {
-            .object(["profiles": .array(StorageRoot.shared.profiles.map(ProfileCommands.row))])
-        }
-    }
-
-    @MainActor
     static func handleInspectProfile(_ command: ProfileRequest, runtime: any ProfileRuntime, reply: ProfileRPC.Reply) {
         ProfileCommands.perform("inspect", runtime: runtime, reply: reply) {
             try await ProfileCommands.result(ProfileCommands.profile(command.profileId), contents: true)
-        }
-    }
-
-    @MainActor
-    static func handleCreateProfile(_ command: CreateProfileRequest, runtime: any ProfileRuntime, reply: ProfileRPC.Reply) {
-        ProfileCommands.perform("create", runtime: runtime, reply: reply, mutation: true) {
-            let storage = StorageRoot.shared
-            let name = StorageRoot.cleanName(command.name)
-            guard !command.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                  name.count <= 100, !storage.nameTaken(name) else { throw RuntimeError.bridge("Invalid or duplicate Profile name") }
-            let existing = Set(storage.profiles.map(\.id))
-            try await storage.createProfile(name: name, location: .local)
-            guard let created = storage.profiles.first(where: { !existing.contains($0.id) }) else { throw RuntimeError.bridge("Profile was not created") }
-            return try await ProfileCommands.result(created)
-        }
-    }
-
-    @MainActor
-    static func handleSelectProfile(_ command: ProfileRequest, runtime: any ProfileRuntime, reply: ProfileRPC.Reply) {
-        ProfileCommands.perform("select", runtime: runtime, reply: reply, mutation: true) {
-            try ProfileCommands.requireIdle(runtime)
-            let profile = try ProfileCommands.profile(command.profileId)
-            try await StorageRoot.shared.switchTo(profile)
-            return try await ProfileCommands.result(ProfileCommands.profile(command.profileId))
         }
     }
 

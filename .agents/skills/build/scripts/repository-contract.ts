@@ -7,7 +7,7 @@ export function artifacts(): Record<string, string> {
   const schema = {
     $schema: "http://json-schema.org/draft-07/schema#",
     $id: `urn:openox:repository:${REPOSITORY_VERSIONS.at(-1)}`,
-    title: "OpenOx Host-Repository content contract",
+    title: "OpenOx Profile-Repository content contract",
     $ref: "#/definitions/RepositoryPackage",
     definitions: {
       RepositoryPackage: RepositoryPackageSchema,
@@ -26,7 +26,7 @@ export function artifacts(): Record<string, string> {
 
 export async function check(): Promise<string> {
   await checkGenerated(artifacts(), "build:repository-schema");
-  return `Host-Repository contract: versions ${REPOSITORY_VERSIONS.join(", ")}, portable schemas and iOS version synchronized`;
+  return `Profile-Repository contract: versions ${REPOSITORY_VERSIONS.join(", ")}, portable schemas and iOS version synchronized`;
 }
 
 if (import.meta.main) {

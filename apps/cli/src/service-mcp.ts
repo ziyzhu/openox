@@ -3,7 +3,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema, type Tool } from "@modelcontextprotocol/sdk/types.js";
 import packageMetadata from "../package.json";
-import { createHostServiceRuntime } from "./service-runtime.ts";
+import { createProfileServiceRuntime } from "./service-runtime.ts";
 
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -12,10 +12,10 @@ function object(value: unknown): value is Record<string, unknown> {
 type ServiceTool = { tool: Tool; domain: string; action: string };
 
 export async function serveServiceMCP(endpoint: string | undefined, timeoutMs: number): Promise<void> {
-  const runtime = createHostServiceRuntime(endpoint);
+  const runtime = createProfileServiceRuntime(endpoint);
   const server = new Server({ name: "ox", version: packageMetadata.version }, {
     capabilities: { tools: { listChanged: true } },
-    instructions: "Ox service actions run on the selected Host under its existing approval policies. Tool input is wrapped in input; session and pageUrl optionally route website actions. Approval-required actions are not automatically approved. Complete login and other human interactions in Ox. Failed or timed-out calls may have effects; inspect state before retrying writes. Remote MCP actions appear after the Host discovers them.",
+    instructions: "Ox service actions run in the open Profile under its approval policies. Tool input is wrapped in input; session and pageUrl optionally route website actions. Approval-required actions are not automatically approved. Complete login and other human interactions in Ox. Failed or timed-out calls may have effects; inspect state before retrying writes. Remote MCP actions appear after the Host discovers them.",
   });
   let tools = new Map<string, ServiceTool>();
   let signature = "";
@@ -27,13 +27,13 @@ export async function serveServiceMCP(endpoint: string | undefined, timeoutMs: n
       const result = await runtime.status(timeoutMs);
       const next = new Map<string, ServiceTool>();
       for (const service of result.services as Record<string, unknown>[]) {
-        if (!Array.isArray(service.actions)) throw new Error("Host does not expose service action metadata; update the Ox Host to use service MCP.");
+        if (!Array.isArray(service.actions)) throw new Error("Ox does not expose service action metadata; update Ox to use service MCP.");
         const domain = String(service.domain);
         const definitions = object(service.manifest) && object(service.manifest.$defs) ? service.manifest.$defs : {};
         for (const action of service.actions) {
           if (!object(action) || typeof action.id !== "string" || !object(action.inputSchema)
             || (action.outputSchema !== null && !object(action.outputSchema))) {
-            throw new Error(`Host returned an invalid action contract for ${domain}`);
+            throw new Error(`Ox returned an invalid action contract for ${domain}`);
           }
           const outputSchema = action.outputSchema === null ? { type: "null" } : action.outputSchema;
           const target = `${domain}:${action.id}`;
@@ -42,7 +42,7 @@ export async function serveServiceMCP(endpoint: string | undefined, timeoutMs: n
           const tool: Tool = {
             name,
             title: `${String(service.title)}: ${String(action.label ?? action.id)}`,
-            description: `${target}${typeof action.description === "string" ? ` — ${action.description}` : ""}. Host approval policies apply.`,
+            description: `${target}${typeof action.description === "string" ? ` — ${action.description}` : ""}. Profile approval policies apply.`,
             inputSchema: {
               type: "object",
               properties: {

@@ -41,7 +41,7 @@ export function artifacts(): Record<string, string> {
     RequestBatch: RequestBatchSchema, ResponseBatch: ResponseBatchSchema };
   const schema = {
     $schema: "http://json-schema.org/draft-07/schema#", $id: `urn:openox:host-rpc:${RPC_VERSION}`,
-    title: "OpenOx Host JSON-RPC messages",
+    title: "OpenOx Profile JSON-RPC messages",
     anyOf: ["Request", "Response", "RequestBatch", "ResponseBatch"].map(name => ({ $ref: `#/definitions/${name}` })),
     definitions: portable(definitions),
   };
@@ -64,7 +64,7 @@ export function artifacts(): Record<string, string> {
 
 export async function check(): Promise<string> {
   await checkGenerated(artifacts(), "build:profile-schema");
-  return `Host RPC schema v${RPC_VERSION}: ${Object.keys(Methods).length} methods, JSON Schema and Swift requests synchronized`;
+  return `Profile RPC schema v${RPC_VERSION}: ${Object.keys(Methods).length} methods, JSON Schema and Swift requests synchronized`;
 }
 
 if (import.meta.main) {

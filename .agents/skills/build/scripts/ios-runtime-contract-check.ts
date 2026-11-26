@@ -120,11 +120,11 @@ export async function check(): Promise<string> {
     failures.push("WebSocket transport must not select loopback directly or expose an unrestricted listener");
   }
   const transportIngress = await readFile(join(ROOT, "apps/ios/Runtime/ServerIngress.swift"), "utf8");
-  for (const required of ["#if DEBUG && targetEnvironment(simulator)", 'environment["OX_HOST_LOOPBACK"] == "1"', "parameters.requiredInterface = ingress.interface", "parameters.requiredInterfaceType = .loopback", "TailscaleIngress.current(on:", 'address == "127.0.0.1"', "remoteHost == NWEndpoint.Host(address)"]) {
+  for (const required of ["#if DEBUG && targetEnvironment(simulator)", 'environment["OX_PROFILE_LOOPBACK"] ?? ProcessInfo.processInfo.environment["OX_HOST_LOOPBACK"]) == "1"', "parameters.requiredInterface = ingress.interface", "parameters.requiredInterfaceType = .loopback", "TailscaleIngress.current(on:", 'address == "127.0.0.1"', "remoteHost == NWEndpoint.Host(address)"]) {
     if (!transportIngress.includes(required)) failures.push(`Server ingress must constrain its opt-in Debug loopback (${required})`);
   }
   const productionIngress = transportIngress.replace(/#if DEBUG && targetEnvironment\(simulator\)[\s\S]*?#endif/g, "");
-  if ([".loopback", '"127.0.0.1"', '"OX_HOST_LOOPBACK"'].some(value => productionIngress.includes(value))) {
+  if ([".loopback", '"127.0.0.1"', '"OX_HOST_LOOPBACK"', '"OX_PROFILE_LOOPBACK"'].some(value => productionIngress.includes(value))) {
     failures.push("Debug loopback must be compiled out of Release and physical-device builds");
   }
   if (app.includes("ProfileServer.configuredPort != nil")) {

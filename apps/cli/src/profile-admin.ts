@@ -1,7 +1,7 @@
 import { link, mkdtemp, open, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { callHost, HostRPCClient } from "./host-rpc.ts";
+import { callProfile, ProfileRPCClient } from "./profile-rpc.ts";
 import { type CliContext, type SubCommand } from "./lib.ts";
 
 export function adminArgs(args: string[], strings: string[] = []) {
@@ -20,12 +20,14 @@ export function adminArgs(args: string[], strings: string[] = []) {
 
 export async function adminCall(method: string, params: Record<string, unknown>, args: ReturnType<typeof adminArgs>, context: CliContext) {
   if (method.startsWith("files.")) {
-    const description = await callHost("host.describe", {}, args.timeout, context.host);
-    if (!Array.isArray(description.methods) || !description.methods.includes("files.assign")) {
-      throw new Error("Update the Host to a build supporting Profile-bound folder mounts");
+    const client = new ProfileRPCClient(context.endpoint);
+    let description: Awaited<ReturnType<ProfileRPCClient["describe"]>>;
+    try { description = await client.describe(args.timeout); } finally { client.close(); }
+    if (!description.methods.includes("files.assign")) {
+      throw new Error("Update Ox to a build supporting Profile-bound folder mounts");
     }
   }
-  return callHost(method, params, args.timeout, context.host);
+  return callProfile(method, params, args.timeout, context.endpoint);
 }
 
 export function printAdminResult(value: Record<string, unknown>, json: boolean | undefined) {
@@ -39,10 +41,9 @@ export function printAdminResult(value: Record<string, unknown>, json: boolean |
 function command(method: string, usage: string, parameter?: string): SubCommand {
   return { desc: usage, fn: async (raw, context) => {
     const args = adminArgs(raw);
-    if (args.values.help) { console.log(`Usage: ox [--host <ws-url>] ${usage} [--json] [--timeout 30000]`); return; }
+    if (args.values.help) { console.log(`Usage: ox [--profile <ws-url>] ${usage} [--json] [--timeout 30000]`); return; }
     if (args.positionals.length !== (parameter ? 1 : 0)) throw new Error(`Usage: ox ${usage}`);
     const params: Record<string, unknown> = parameter ? { [parameter]: args.positionals[0] } : {};
-    if (method.startsWith("files.") && context.profile) params.profileId = context.profile;
     printAdminResult(await adminCall(method, params, args, context), args.values.json);
   } };
 }
@@ -52,7 +53,7 @@ const downloadUsage = "files download (<path> | --attachment <id>) --output <loc
 async function downloadFile(raw: string[], context: CliContext): Promise<void> {
   const args = adminArgs(raw, ["output", "attachment"]);
   if (args.values.help) {
-    console.log(`Usage: ox [--host <ws-url>] [--conversation <id>] ${downloadUsage} [--timeout 30000]`);
+    console.log(`Usage: ox [--profile <ws-url>] [--conversation <id>] ${downloadUsage} [--timeout 30000]`);
     return;
   }
   const { output, attachment } = args.values;
@@ -61,13 +62,13 @@ async function downloadFile(raw: string[], context: CliContext): Promise<void> {
     throw new Error(`Usage: ox ${downloadUsage}`);
   }
   const params = path ? { path } : { attachmentId: attachment };
-  const client = new HostRPCClient(context.host);
+  const client = new ProfileRPCClient(context.endpoint);
   const destination = resolve(output);
   const directory = await mkdtemp(join(dirname(destination), ".ox-download-"));
   const temporary = join(directory, "file");
   try {
-    const host = await client.describe(args.timeout);
-    if (!host.methods.includes("files.download")) throw new Error("Update the Host to a build supporting file downloads");
+    const description = await client.describe(args.timeout);
+    if (!description.methods.includes("files.download")) throw new Error("Update Ox to a build supporting file downloads");
     const file = await open(temporary, "wx", 0o600);
     let offset = 0;
     try {
@@ -79,11 +80,11 @@ async function downloadFile(raw: string[], context: CliContext): Promise<void> {
         const { transferId: id, size: bytes, offset: start, data } = result;
         if (typeof id !== "string" || typeof bytes !== "number" || typeof data !== "string" || start !== offset
           || (transferId !== undefined && (id !== transferId || bytes !== size))) {
-          throw new Error("Host returned an inconsistent file transfer");
+          throw new Error("Ox returned an inconsistent file transfer");
         }
         const chunk = Buffer.from(data, "base64");
         if (chunk.toString("base64") !== data || (chunk.length === 0 && offset < bytes) || offset + chunk.length > bytes) {
-          throw new Error("Host returned an invalid file chunk");
+          throw new Error("Ox returned an invalid file chunk");
         }
         await file.writeFile(chunk);
         offset += chunk.length;
@@ -112,7 +113,7 @@ export const FILE_COMMANDS = {
   assign: command("files.assign", "files assign <unassigned-grant-id>", "grantId"),
   unmount: command("files.unmount", "files unmount <grant-id>", "grantId"),
 };
-export const HOST_REPOSITORY_COMMANDS = {
+export const PROFILE_REPOSITORY_COMMANDS = {
   list: command("repositories.list", "repository list"),
   connect: command("repositories.connectFolder", "repository connect mounts/<grant-id>[/subfolder]", "path"),
   disconnect: command("repositories.disconnectFolder", "repository disconnect <repository-id>", "repositoryId"),

@@ -48,12 +48,12 @@ try {
   const version = (await run([executable, "--version"], resolve(import.meta.dir, "../.."))).trim();
   if (version !== packageMetadata.version) throw new Error(`installed ox reported version ${JSON.stringify(version)}`);
   const help = await run([executable, "--help"], resolve(import.meta.dir, "../.."));
-  if (!help.includes("Use Ox Profiles, repositories, files, services, Hosts, conversations, and VMs")) throw new Error("installed ox help was incomplete");
+  if (!help.includes("Use Ox Profiles, repositories, files, services, conversations, and VMs")) throw new Error("installed ox help was incomplete");
   if (!help.includes("conversation watch")) throw new Error("installed ox help omitted conversation commands");
   if (!help.includes("profile skills")) throw new Error("installed ox help omitted Profile commands");
-  if (!help.includes("host logs")) throw new Error("installed ox help omitted Host commands");
+  if (!help.includes("profile logs")) throw new Error("installed ox help omitted Profile commands");
   if (!help.includes("conversation send")) throw new Error("installed ox help omitted conversation driving commands");
-  if (!help.includes("host providers")) throw new Error("installed ox help omitted provider commands");
+  if (!help.includes("profile providers")) throw new Error("installed ox help omitted provider commands");
   if (help.includes("diagnostics")) throw new Error("installed ox help exposed removed diagnostic commands");
   if (/^\s+serve\s/m.test(help)) throw new Error("installed ox help exposed the extracted Pi MCP server command");
   if (!help.includes("repository verify")) throw new Error("installed ox help omitted repository verification");

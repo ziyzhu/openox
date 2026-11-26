@@ -1,18 +1,19 @@
-import { HostRPCClient } from "./host-rpc.ts";
+import { ProfileRPCClient } from "./profile-rpc.ts";
 import { fail, type CliContext, type SubCommand } from "./lib.ts";
 import { discover } from "./discover.ts";
 import { logs } from "./logs.ts";
 import { providers } from "./providers.ts";
-import { agents } from "./host-agents.ts";
+import { agents } from "./profile-agents.ts";
 
-export const HOST_COMMANDS: Record<string, SubCommand> = {
-  describe: { desc: "Show the Ox app's device, active Profile, protocol versions and methods (--json)", fn: describe },
-  list: { desc: "List reachable devices running Ox (--all includes unavailable candidates)", fn: discover },
-  discover: { desc: "Alias for host list", fn: discover },
-  logs: { desc: "Read or follow the active Profile's structured logs", fn: logs },
-  providers: { desc: "List the active Profile's model providers and their models", fn: providers },
-  agents: { desc: "List, add or remove the active Profile's remote agents (ox agent serve endpoints)", fn: agents },
+export const LIVE_PROFILE_COMMANDS: Record<string, SubCommand> = {
+  describe: { desc: "Show the open Profile, its device, protocol versions and methods (--json)", fn: describe },
+  discover: { desc: "List reachable devices with a Profile open in Ox (--all includes unavailable candidates)", fn: discover },
+  logs: { desc: "Read or follow the Profile's structured logs", fn: logs },
+  providers: { desc: "List the Profile's model providers and their models", fn: providers },
+  agents: { desc: "List, add or remove the Profile's remote agents (ox agent serve endpoints)", fn: agents },
 };
+
+export const LEGACY_HOST_COMMANDS: Record<string, SubCommand> = { ...LIVE_PROFILE_COMMANDS, list: LIVE_PROFILE_COMMANDS.discover! };
 
 async function describe(args: string[], context: CliContext): Promise<void> {
   let json = false;
@@ -24,11 +25,11 @@ async function describe(args: string[], context: CliContext): Promise<void> {
       timeoutMs = Number(argument === "--timeout" ? args[++index] : argument.slice(10));
       if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) fail("--timeout must be a positive number");
     } else if (argument === "--help" || argument === "-h") {
-      console.log("Usage: ox [--host <ws-url>] host describe [--json] [--timeout 30000]");
+      console.log("Usage: ox [--profile <ws-url>] profile describe [--json] [--timeout 30000]");
       return;
     } else fail(`unknown option: ${argument}`);
   }
-  const client = new HostRPCClient(context.host);
+  const client = new ProfileRPCClient(context.endpoint);
   try {
     const description = await client.describe(timeoutMs);
     if (json) console.log(JSON.stringify(description, null, 2));

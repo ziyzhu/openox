@@ -49,7 +49,7 @@ struct ProfileFilesPage: View {
                         if !mounts.isEmpty { Divider().settingsContentInset() }
                         Button { perform("mount") { profileId in
                             let url = try await FolderPicker.choose()
-                            _ = try ProfileCommands.profile(profileId.uuidString)
+                            guard StorageRoot.shared.profiles.contains(where: { $0.id == profileId }) else { throw RuntimeError.bridge("This Profile is no longer available") }
                             try await store.add(url, profileId: profileId)
                         } } label: {
                             HStack(spacing: Theme.Spacing.md) {

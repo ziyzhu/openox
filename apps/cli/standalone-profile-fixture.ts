@@ -19,7 +19,7 @@ const results: Record<string, unknown> = {
   "conversations.get": { data: snapshot },
 };
 
-export function hostFixtureReply(request: { jsonrpc?: string; id?: string | number; method: string; params?: Record<string, unknown> }) {
+export function profileFixtureReply(request: { jsonrpc?: string; id?: string | number; method: string; params?: Record<string, unknown> }) {
   const reply = { jsonrpc: "2.0", id: request.id ?? null };
   if (request.jsonrpc !== "2.0") return { ...reply, error: { code: -32600, message: "Invalid Request" } };
   if (!(request.method in results)) return { ...reply, error: { code: -32601, message: "Method not found" } };

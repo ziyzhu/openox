@@ -1,39 +1,23 @@
 {
   "version": 4,
   "methods": {
+    "profile.describe": {
+      "params": {
+        "$ref": "./schema.json#/definitions/EmptyRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ProfileDescription"
+      }
+    },
     "host.describe": {
       "params": {
         "$ref": "./schema.json#/definitions/EmptyRequest"
       },
       "result": {
-        "$ref": "./schema.json#/definitions/HostDescription"
-      }
-    },
-    "profiles.list": {
-      "params": {
-        "$ref": "./schema.json#/definitions/EmptyRequest"
-      },
-      "result": {
-        "$ref": "./schema.json#/definitions/ListProfilesResult"
+        "$ref": "./schema.json#/definitions/ProfileDescription"
       }
     },
     "profiles.inspect": {
-      "params": {
-        "$ref": "./schema.json#/definitions/ProfileRequest"
-      },
-      "result": {
-        "$ref": "./schema.json#/definitions/ProfileResult"
-      }
-    },
-    "profiles.create": {
-      "params": {
-        "$ref": "./schema.json#/definitions/CreateProfileRequest"
-      },
-      "result": {
-        "$ref": "./schema.json#/definitions/ProfileResult"
-      }
-    },
-    "profiles.select": {
       "params": {
         "$ref": "./schema.json#/definitions/ProfileRequest"
       },

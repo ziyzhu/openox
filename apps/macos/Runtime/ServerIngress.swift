@@ -9,7 +9,7 @@ nonisolated enum ServerIngress: Equatable, Sendable {
 
     static var loopbackEnabled: Bool {
         #if DEBUG
-        ProcessInfo.processInfo.environment["OX_HOST_LOOPBACK"] == "1"
+        (ProcessInfo.processInfo.environment["OX_PROFILE_LOOPBACK"] ?? ProcessInfo.processInfo.environment["OX_HOST_LOOPBACK"]) == "1"
         #else
         false
         #endif

@@ -1,14 +1,14 @@
 import { readFile } from "node:fs/promises";
 import { parseArgs, type ParseArgsOptionsConfig } from "node:util";
 import { C, fail, printResult, terminalText, type CliContext, type SubCommand } from "./lib.ts";
-import { createHostServiceRuntime } from "./service-runtime.ts";
+import { createProfileServiceRuntime } from "./service-runtime.ts";
 import { serveServiceMCP } from "./service-mcp.ts";
 
 export const SERVICE_COMMANDS: Record<string, SubCommand> = {
-  list: { desc: "Show the Host's services and their live page state", fn: serviceStatus },
+  list: { desc: "Show the Profile's services and their live page state", fn: serviceStatus },
   mcp: { desc: "Expose available service actions as MCP tools over stdio", fn: mcp },
-  invoke: { desc: "Invoke a service action through the selected Host", fn: invoke },
-  eval: { desc: "Run a JS script on a Host-managed service page", fn: evaluate },
+  invoke: { desc: "Invoke a service action in the Profile", fn: invoke },
+  eval: { desc: "Run a JS script on an Ox-managed service page", fn: evaluate },
   reload: { desc: "Reload a service page after active actions finish", fn: reload },
   "refresh-auth": { desc: "Recheck a service's authentication state", fn: refreshAuth },
   sync: { desc: "Refresh service definitions and invalidate changed live services", fn: syncServices },
@@ -18,7 +18,7 @@ async function mcp(args: string[], context: CliContext): Promise<void> {
   const parsed = options(args, "service mcp");
   if (!parsed) return;
   if (parsed.values.json) fail("--json cannot be used with service mcp; stdout carries MCP messages");
-  await serveServiceMCP(context.host, parsed.timeoutMs);
+  await serveServiceMCP(context.endpoint, parsed.timeoutMs);
 }
 
 function options(args: string[], usage: string, config: ParseArgsOptionsConfig = {}, maximumPositionals = 0, defaultTimeout = 30000) {
@@ -79,8 +79,8 @@ async function invoke(args: string[], context: CliContext): Promise<void> {
   let actionArgs: unknown;
   try { actionArgs = JSON.parse(raw); }
   catch (error) { fail(`invalid action arguments JSON: ${(error as Error).message}`); }
-  const host = createHostServiceRuntime(context.host);
-  printResult(await host.invoke({ domain: target.slice(0, separator), action: target.slice(separator + 1),
+  const profile = createProfileServiceRuntime(context.endpoint);
+  printResult(await profile.invoke({ domain: target.slice(0, separator), action: target.slice(separator + 1),
     args: actionArgs, session, pageUrl, approved: values.approve === true ? true : undefined, timeoutMs }));
 }
 
@@ -95,7 +95,7 @@ async function evaluate(args: string[], context: CliContext): Promise<void> {
   if (sources.length !== 1) fail("provide exactly one script or script file");
   const script = values["script-file"] !== undefined ? await inputText(String(values["script-file"])) : String(values.script ?? positionals[1]);
   if (!script.trim()) fail("script must not be empty");
-  printResult(await createHostServiceRuntime(context.host).evaluate({ domain, script, timeoutMs }));
+  printResult(await createProfileServiceRuntime(context.endpoint).evaluate({ domain, script, timeoutMs }));
 }
 
 async function serviceOperation(args: string[], context: CliContext, operation: "reload" | "refreshAuth") {
@@ -103,7 +103,7 @@ async function serviceOperation(args: string[], context: CliContext, operation: 
   const parsed = options(args, `service ${name} <domain>`, {}, 1);
   if (!parsed) return;
   const domain = parsed.positionals[0] ?? fail("expected <domain>");
-  printResult(await createHostServiceRuntime(context.host)[operation]({ domain, timeoutMs: parsed.timeoutMs }));
+  printResult(await createProfileServiceRuntime(context.endpoint)[operation]({ domain, timeoutMs: parsed.timeoutMs }));
 }
 
 async function reload(args: string[], context: CliContext): Promise<void> {
@@ -117,7 +117,7 @@ async function refreshAuth(args: string[], context: CliContext): Promise<void> {
 export async function serviceStatus(args: string[], context: CliContext): Promise<void> {
   const parsed = options(args, "service list");
   if (!parsed) return;
-  const result = await createHostServiceRuntime(context.host).status(parsed.timeoutMs);
+  const result = await createProfileServiceRuntime(context.endpoint).status(parsed.timeoutMs);
   const services = (result.services ?? []) as Array<Record<string, unknown>>;
   if (parsed.values.json) {
     console.log(JSON.stringify(services, null, 2));
@@ -142,7 +142,7 @@ export async function serviceStatus(args: string[], context: CliContext): Promis
 async function syncServices(args: string[], context: CliContext): Promise<void> {
   const parsed = options(args, "service sync", {}, 0, 60000);
   if (!parsed) return;
-  const result = await createHostServiceRuntime(context.host).sync(parsed.timeoutMs);
+  const result = await createProfileServiceRuntime(context.endpoint).sync(parsed.timeoutMs);
   if (parsed.values.json) {
     console.log(JSON.stringify(result, null, 2));
     return;

@@ -52,7 +52,7 @@ if (import.meta.main) {
       'for (const name of ["schema.json","methods.json","fixtures.json","repository.schema.json"]) await import(`@openox/protocol/${name}`);',
     ].join("\n"));
     await run(["bun", script], install);
-    console.log("PASS installed protocol package: Client-Host and Host-Repository exports");
+    console.log("PASS installed protocol package: Client-Profile and Profile-Repository exports");
     if (outputArgument >= 0) console.log(`Tarball ${tarball}`);
   } finally {
     await rm(temporary, { recursive: true, force: true });

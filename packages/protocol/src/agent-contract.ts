@@ -96,7 +96,7 @@ export const AgentSchemas = {
     environment: PushEnvironment,
     key: S({ minLength: 44, maxLength: 44, description: "Base64 AES-256-GCM key; the device decrypts notification text with it." }),
     kinds: A(PushKind),
-  }, { description: "Push a notification to this device when a conversation changes while no Host is subscribed to it." }),
+  }, { description: "Push a notification to this device when a conversation changes while no Ox app is subscribed to it." }),
   AgentPushUnregistration: object("AgentPushUnregistration", { token: S() }),
 };
 
@@ -129,9 +129,11 @@ export const AgentNotifications = {
   "tools.progress": notification("AgentToolProgressNotification"),
 } as const;
 
-export const AgentHostRequests = {
+export const AgentProfileRequests = {
   "tools.call": method("AgentToolCallRequest", "AgentToolCallResult"),
 } as const;
+
+export const AgentHostRequests = AgentProfileRequests;
 
 export const AgentRequiredMethods = [
   "agent.describe", "conversations.list", "conversations.new", "conversations.open", "conversations.send",

@@ -1,7 +1,7 @@
 {
   "name": "@openox/protocol",
   "version": "0.1.0",
-  "description": "Shared OpenOx Client-Host and Host-Repository contracts, schemas, and validation",
+  "description": "Shared OpenOx Client-Profile and Profile-Repository contracts, schemas, and validation",
   "license": "Apache-2.0",
   "type": "module",
   "files": ["src", "schema.json", "methods.json", "fixtures.json", "repository.schema.json", "LICENSE"],

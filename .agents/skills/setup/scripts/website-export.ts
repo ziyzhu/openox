@@ -1,6 +1,6 @@
 import { open, realpath, rm } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
-import { callHost } from "../../../../apps/cli/src/host-rpc.ts";
+import { callProfile } from "../../../../apps/cli/src/profile-rpc.ts";
 import { ROOT } from "../../../lib.ts";
 import { qaCommand } from "./qa-config.ts";
 import { claimSimulator, requireSimulator } from "./simulator.ts";
@@ -24,7 +24,7 @@ try {
     const descriptor = await open(path, "wx", 0o600);
     let completed = false;
     try {
-      const result = await callHost("debug.websiteData.export", {}, 60_000, endpoint);
+      const result = await callProfile("debug.websiteData.export", {}, 60_000, endpoint);
       if (typeof result.data !== "string" || typeof result.bytes !== "number") throw new Error("Invalid website snapshot response");
       const bytes = Buffer.from(result.data, "base64");
       if (bytes.length !== result.bytes) throw new Error("Incomplete website snapshot response");

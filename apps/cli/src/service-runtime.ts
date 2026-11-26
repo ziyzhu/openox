@@ -1,4 +1,4 @@
-import { callHost } from "./host-rpc.ts";
+import { callProfile } from "./profile-rpc.ts";
 
 export type InvokeRequest = {
   domain: string;
@@ -21,7 +21,7 @@ export type ReloadRequest = {
   timeoutMs: number;
 };
 
-export interface HostServiceRuntime {
+export interface ProfileServiceRuntime {
   status(timeoutMs: number): Promise<Record<string, unknown>>;
   invoke(request: InvokeRequest): Promise<Record<string, unknown>>;
   evaluate(request: EvaluateRequest): Promise<Record<string, unknown>>;
@@ -30,17 +30,17 @@ export interface HostServiceRuntime {
   sync(timeoutMs: number): Promise<Record<string, unknown>>;
 }
 
-class WebSocketHostServiceRuntime implements HostServiceRuntime {
+class WebSocketProfileServiceRuntime implements ProfileServiceRuntime {
   private readonly endpoint?: string;
 
   constructor(endpoint?: string) {
     this.endpoint = endpoint;
   }
 
-  status(timeoutMs: number) { return callHost("services.list", {}, timeoutMs, this.endpoint); }
+  status(timeoutMs: number) { return callProfile("services.list", {}, timeoutMs, this.endpoint); }
 
   invoke(request: InvokeRequest) {
-    return callHost("services.invoke", { domain: request.domain, action: request.action, args: request.args,
+    return callProfile("services.invoke", { domain: request.domain, action: request.action, args: request.args,
       ...(request.approved === undefined ? {} : { approve: request.approved }),
       ...(request.session === undefined ? {} : { session: request.session }),
       ...(request.pageUrl === undefined ? {} : { pageUrl: request.pageUrl }),
@@ -48,16 +48,16 @@ class WebSocketHostServiceRuntime implements HostServiceRuntime {
   }
 
   evaluate(request: EvaluateRequest) {
-    return callHost("services.evaluate", { domain: request.domain, script: request.script }, request.timeoutMs, this.endpoint);
+    return callProfile("services.evaluate", { domain: request.domain, script: request.script }, request.timeoutMs, this.endpoint);
   }
 
-  reload(request: ReloadRequest) { return callHost("services.reload", { domain: request.domain }, request.timeoutMs, this.endpoint); }
+  reload(request: ReloadRequest) { return callProfile("services.reload", { domain: request.domain }, request.timeoutMs, this.endpoint); }
 
-  refreshAuth(request: ReloadRequest) { return callHost("services.refreshAuth", { domain: request.domain }, request.timeoutMs, this.endpoint); }
+  refreshAuth(request: ReloadRequest) { return callProfile("services.refreshAuth", { domain: request.domain }, request.timeoutMs, this.endpoint); }
 
-  sync(timeoutMs: number) { return callHost("services.sync", {}, timeoutMs, this.endpoint); }
+  sync(timeoutMs: number) { return callProfile("services.sync", {}, timeoutMs, this.endpoint); }
 }
 
-export function createHostServiceRuntime(endpoint?: string): HostServiceRuntime {
-  return new WebSocketHostServiceRuntime(endpoint);
+export function createProfileServiceRuntime(endpoint?: string): ProfileServiceRuntime {
+  return new WebSocketProfileServiceRuntime(endpoint);
 }
