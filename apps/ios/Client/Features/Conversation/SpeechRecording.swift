@@ -57,10 +57,10 @@ final class OnDeviceSpeechRecording {
         onDownload: @escaping (Int) -> Void,
         onTranscript: @escaping (String) -> Void
     ) async throws -> Bool {
-        var needsAnotherPress = false
+        var promptedForPermission = false
         switch AVAudioApplication.shared.recordPermission {
         case .undetermined:
-            needsAnotherPress = true
+            promptedForPermission = true
             guard await AVAudioApplication.requestRecordPermission() else {
                 throw SpeechInputError.microphonePermission
             }
@@ -89,7 +89,7 @@ final class OnDeviceSpeechRecording {
         Log.ui.info("SpeechInput.assets module=\(String(describing: type(of: module))) status=\(String(describing: assetStatus)) locale=\(locale.identifier)")
         if assetStatus != .installed,
            let request = try await AssetInventory.assetInstallationRequest(supporting: [module]) {
-            needsAnotherPress = true
+            let installStarted = ContinuousClock.now
             let progress = request.progress
             let reporting = Task {
                 while !Task.isCancelled {
@@ -100,11 +100,11 @@ final class OnDeviceSpeechRecording {
             defer { reporting.cancel() }
             try await request.downloadAndInstall()
             let installedStatus = await AssetInventory.status(forModules: [module])
-            Log.ui.info("SpeechInput.assets prepared status=\(String(describing: installedStatus))")
+            Log.ui.info("SpeechInput.assets prepared status=\(String(describing: installedStatus)) duration=\(installStarted.duration(to: .now))")
         }
         try Task.checkCancellation()
         analyzer = SpeechAnalyzer(modules: [module], options: .init(priority: .userInitiated, modelRetention: .lingering))
-        return needsAnotherPress
+        return promptedForPermission
     }
 
     func start(onLevel: @escaping (Float) -> Void, onFailure: @escaping (Error) -> Void) async throws {

@@ -50,6 +50,7 @@ final class ConversationSpeechInput {
 
     private static let tapDuration = Duration.milliseconds(350)
     private static let captureTail = Duration.milliseconds(250)
+    private static let downloadNoticeDelay = Duration.seconds(1)
 
     private(set) var state = State.idle
     private(set) var level: Float = 0
@@ -111,7 +112,7 @@ final class ConversationSpeechInput {
         task = Task { [self] in
             defer { if Task.isCancelled { recording.cancel() } }
             do {
-                let setup = try await recording.prepare(
+                let promptedForPermission = try await recording.prepare(
                     locale: locale,
                     onDownload: { [weak self] percent in self?.downloading(percent, session: id) },
                     onTranscript: { [weak self] text in
@@ -121,7 +122,7 @@ final class ConversationSpeechInput {
                 )
                 try Task.checkCancellation()
                 guard sessionID == id else { return }
-                guard !setup, case .preparing(let requested?) = state else {
+                guard !promptedForPermission, case .preparing(let requested?) = state else {
                     cancel(reason: "prepared")
                     notice = Toast(
                         message: L10n.string("Voice input is ready. Tap or hold the microphone to talk.", comment: "Notice shown after microphone permission or the speech model finishes setting up."),
@@ -255,7 +256,7 @@ final class ConversationSpeechInput {
     private func downloading(_ percent: Int, session id: UUID) {
         guard sessionID == id else { return }
         switch state {
-        case .preparing:
+        case .preparing where pressedAt.duration(to: .now) >= Self.downloadNoticeDelay:
             deadline?.cancel()
             deadline = nil
             Log.ui.info("SpeechInput.download started session=\(id)")
