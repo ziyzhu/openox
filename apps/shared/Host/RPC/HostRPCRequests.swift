@@ -34,6 +34,10 @@ extension OxHostProtocol {
         case sendConversation = "conversations.send"
         case stopConversation = "conversations.stop"
         case listProviders = "providers.list"
+        case listAgents = "agents.list"
+        case addAgent = "agents.add"
+        case removeAgent = "agents.remove"
+        case listAgentConversations = "agents.conversations"
         case getLogs = "logs.list"
         case getComposerFormatting = "debug.composer.formatting"
         case repositoryGate = "debug.repositories.saveGate"
@@ -134,12 +138,22 @@ extension OxHostProtocol {
         let temporary: Bool?
         let providerId: String?
         let modelId: String?
+        let agentEndpoint: String?
     }
 
     struct SendConversationRequest: Decodable {
         let conversationId: String?
         let text: String
         let wait: Bool?
+    }
+
+    struct AddAgentRequest: Decodable {
+        let name: String
+        let endpoint: String
+    }
+
+    struct AgentEndpointRequest: Decodable {
+        let endpoint: String
     }
 
     struct GetLogsRequest: Decodable {

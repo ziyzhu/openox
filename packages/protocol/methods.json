@@ -241,6 +241,38 @@
         "$ref": "./schema.json#/definitions/ListProvidersResult"
       }
     },
+    "agents.list": {
+      "params": {
+        "$ref": "./schema.json#/definitions/EmptyRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ListAgentsResult"
+      }
+    },
+    "agents.add": {
+      "params": {
+        "$ref": "./schema.json#/definitions/AddAgentRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/AgentResult"
+      }
+    },
+    "agents.remove": {
+      "params": {
+        "$ref": "./schema.json#/definitions/AgentEndpointRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
+    "agents.conversations": {
+      "params": {
+        "$ref": "./schema.json#/definitions/AgentEndpointRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ListAgentConversationsResult"
+      }
+    },
     "logs.list": {
       "params": {
         "$ref": "./schema.json#/definitions/GetLogsRequest"

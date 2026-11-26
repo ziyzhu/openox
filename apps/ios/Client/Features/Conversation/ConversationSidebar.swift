@@ -264,6 +264,12 @@ private struct SidebarRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: Theme.Spacing.sm) {
                     activityIndicator
+                    if meta.remoteAgent != nil {
+                        Image(systemName: "terminal")
+                            .font(.system(.body, weight: .medium))
+                            .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                            .accessibilityHidden(true)
+                    }
                     if meta.scheduleID != nil {
                         Image(systemName: "clock")
                             .font(.system(.body, weight: .medium))
@@ -293,7 +299,8 @@ private struct SidebarRow: View {
     private var accessibilityValue: String {
         let activity = activityAccessibilityValue
         let lastModified = lastModifiedText(relativeTo: Date())
-        return [favoriteAccessibilityValue, lastModified, scheduledAccessibilityValue, activity]
+        let agent = meta.remoteAgent.map { RemoteAgentDirectory.shared.displayName(for: $0.endpoint) } ?? ""
+        return [favoriteAccessibilityValue, agent, lastModified, scheduledAccessibilityValue, activity]
             .filter { !$0.isEmpty }
             .joined(separator: ", ")
     }

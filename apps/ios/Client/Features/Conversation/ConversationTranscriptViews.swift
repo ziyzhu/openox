@@ -387,6 +387,7 @@ struct MessageControls {
     let onCopy: (String) -> Void
     let isCopied: Bool
     let canMutate: Bool
+    let canBranch: Bool
     let onBranch: () -> Void
     let onRetry: () -> Void
     let onEdit: () -> Void
@@ -885,6 +886,7 @@ struct ResponseFooterBlockView: View, Equatable {
         lhs.id == rhs.id
             && lhs.text == rhs.text
             && lhs.controls.isCopied == rhs.controls.isCopied
+            && lhs.controls.canBranch == rhs.controls.canBranch
     }
 
     var body: some View {
@@ -902,19 +904,21 @@ struct ResponseFooterBlockView: View, Equatable {
             .buttonStyle(.plain)
             .accessibilityLabel(A11yLabel.shareMessage)
             .accessibilityIdentifier(actionIdentifier(A11yID.ConversationControls.Message.share))
-            iconButton(
-                systemName: "arrow.branch",
-                label: A11yLabel.branchMessage,
-                id: actionIdentifier(A11yID.ConversationControls.Message.branch)
-            ) {
-                controls.onBranch()
-            }
-            iconButton(
-                systemName: "arrow.clockwise",
-                label: A11yLabel.retryMessage,
-                id: actionIdentifier(A11yID.ConversationControls.Message.retry)
-            ) {
-                controls.onRetry()
+            if controls.canBranch {
+                iconButton(
+                    systemName: "arrow.branch",
+                    label: A11yLabel.branchMessage,
+                    id: actionIdentifier(A11yID.ConversationControls.Message.branch)
+                ) {
+                    controls.onBranch()
+                }
+                iconButton(
+                    systemName: "arrow.clockwise",
+                    label: A11yLabel.retryMessage,
+                    id: actionIdentifier(A11yID.ConversationControls.Message.retry)
+                ) {
+                    controls.onRetry()
+                }
             }
         }
         .padding(.horizontal, 4)

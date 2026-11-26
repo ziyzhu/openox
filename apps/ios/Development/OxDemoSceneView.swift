@@ -116,6 +116,7 @@ struct OxDemoSceneView: View {
                                     onCopy: { UIPasteboard.general.string = $0 },
                                     isCopied: false,
                                     canMutate: false,
+                                    canBranch: true,
                                     onBranch: {},
                                     onRetry: {},
                                     onEdit: {}

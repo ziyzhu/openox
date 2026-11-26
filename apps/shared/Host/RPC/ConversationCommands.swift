@@ -93,8 +93,13 @@ extension OxHostProtocol {
         conversationManager: ConversationManager,
         reply: OxHostRPC.Reply
     ) {
+        let agentEndpoint = command.agentEndpoint.flatMap(RemoteAgentDirectory.endpoint(from:))
+        if command.agentEndpoint != nil {
+            guard let agentEndpoint, RemoteAgentDirectory.shared.agent(for: agentEndpoint) != nil else { return reply.failure("unknown agent: \(command.agentEndpoint ?? "")") }
+            guard command.temporary != true else { return reply.failure("remote agents do not run temporary conversations") }
+        }
         let selection: (client: any ProviderClient, model: ProviderModel)?
-        switch (command.providerId, command.modelId) {
+        switch (agentEndpoint == nil ? command.providerId : nil, agentEndpoint == nil ? command.modelId : nil) {
         case (nil, nil):
             selection = nil
         case (let providerId?, let modelId?):
@@ -127,7 +132,16 @@ extension OxHostProtocol {
                 )
             )
         }
-        let model = "\(conversation.modelSelection.providerID):\(conversation.modelSelection.modelID)"
+        if let agentEndpoint {
+            guard conversation.selectAgent(agentEndpoint) else { return reply.failure("could not select the agent for this conversation") }
+            if let provider = command.providerId, let modelID = command.modelId {
+                conversation.selectRemoteModel(RemoteAgentModel(reference: AgentModelReference(provider: provider, id: modelID), name: modelID, reasoning: false))
+            }
+        } else {
+            conversation.selectAgent(nil)
+        }
+        let model = conversation.remoteAgent.map { binding in binding.model.map { "\($0.provider)/\($0.id)" } ?? "agent default" }
+            ?? "\(conversation.modelSelection.providerID):\(conversation.modelSelection.modelID)"
         Task { @MainActor in
             do { try await conversation.durablePreparation?.value } catch { return reply.failure(error.localizedDescription) }
             Log.agent.info("OxHostRPC.conversations.new id=\(reply.id) conversation=\(conversation.id) temporary=\(conversation.isTemporary) model=\(model)")

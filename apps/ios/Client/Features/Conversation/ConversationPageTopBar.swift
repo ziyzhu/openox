@@ -16,7 +16,8 @@ struct ConversationPageTopBar: View {
     var body: some View {
         ConversationHeader(
             modelTitle: showsModelPicker && blockCount == 0 && (conversation.canChangeRetention || !conversation.isTemporary)
-                ? conversation.model.displayName : nil,
+                ? conversation.remoteAgent.map { _ in conversation.remoteModelName ?? conversation.remoteAgentName ?? "" } ?? conversation.model.displayName : nil,
+            agentTitle: conversation.remoteAgentName,
             iconButtonSize: iconButtonSize,
             onShowSidebar: onShowSidebar,
             onPickModel: onPickModel
@@ -32,9 +33,9 @@ struct ConversationPageTopBar: View {
     private func overflowMenu(conversation: Conversation) -> some View {
         ConversationOverflowMenu(size: iconButtonSize) {
             Button(action: onPickModel) {
-                Label("Models", systemImage: "slider.horizontal.3")
+                Label(conversation.remoteAgent == nil ? "Models" : "Model", systemImage: "slider.horizontal.3")
             }
-            .accessibilityIdentifier(A11yID.ConversationControls.modelPicker)
+            .accessibilityIdentifier(A11yID.ConversationControls.agentPicker)
             if hasFiles || blockCount > 0 {
                 Divider()
             }

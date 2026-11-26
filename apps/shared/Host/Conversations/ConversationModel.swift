@@ -217,6 +217,7 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
     var parentID: UUID?
     var childIDs: [UUID]
     var lastMessageAt: Date?
+    var remoteAgent: RemoteAgentBinding?
 
     init(
         schemaVersion: Int = ConversationFormat.currentSchemaVersion,
@@ -233,7 +234,8 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
         scheduleID: UUID? = nil,
         parentID: UUID? = nil,
         childIDs: [UUID] = [],
-        lastMessageAt: Date? = nil
+        lastMessageAt: Date? = nil,
+        remoteAgent: RemoteAgentBinding? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.id = id
@@ -250,6 +252,7 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
         self.parentID = parentID
         self.childIDs = childIDs
         self.lastMessageAt = lastMessageAt
+        self.remoteAgent = remoteAgent
     }
 
     var displayTitle: String {
@@ -276,6 +279,7 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
         case scheduleID = "scheduledSkillID"
         case parentID = "parentConversationID"
         case childIDs = "childConversationIDs"
+        case remoteAgent
     }
 
     init(from decoder: Decoder) throws {
@@ -295,6 +299,7 @@ nonisolated struct ConversationMeta: Codable, Equatable, Identifiable, Sendable 
         parentID = try values.decodeIfPresent(UUID.self, forKey: .parentID)
         childIDs = try values.decodeIfPresent([UUID].self, forKey: .childIDs) ?? []
         lastMessageAt = nil
+        remoteAgent = try values.decodeIfPresent(RemoteAgentBinding.self, forKey: .remoteAgent)
     }
 }
 

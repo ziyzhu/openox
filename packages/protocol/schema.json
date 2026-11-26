@@ -455,6 +455,52 @@
               "type": "null"
             }
           ]
+        },
+        "agentEndpoint": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "AddAgentRequest": {
+      "type": "object",
+      "required": [
+        "name",
+        "endpoint"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "endpoint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      },
+      "additionalProperties": true
+    },
+    "AgentEndpointRequest": {
+      "type": "object",
+      "required": [
+        "endpoint"
+      ],
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
         }
       },
       "additionalProperties": true
@@ -1078,6 +1124,179 @@
         },
         "active": {
           "type": "boolean"
+        },
+        "agent": {
+          "$ref": "#/definitions/ConversationAgent"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ConversationAgent": {
+      "type": "object",
+      "required": [
+        "name",
+        "endpoint"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "conversationId": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "AgentModelRow": {
+      "type": "object",
+      "required": [
+        "provider",
+        "id",
+        "name",
+        "reasoning"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "reasoning": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "AgentRow": {
+      "type": "object",
+      "required": [
+        "name",
+        "endpoint",
+        "status",
+        "models"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "checking",
+            "online",
+            "offline"
+          ]
+        },
+        "implementation": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentModelRow"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "ListAgentsResult": {
+      "type": "object",
+      "required": [
+        "agents"
+      ],
+      "properties": {
+        "agents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentRow"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "AgentResult": {
+      "type": "object",
+      "required": [
+        "agent"
+      ],
+      "properties": {
+        "agent": {
+          "$ref": "#/definitions/AgentRow"
+        }
+      },
+      "additionalProperties": true
+    },
+    "AgentConversationRow": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "cwd",
+        "state",
+        "origin",
+        "updatedAt"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "hostConversationId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ListAgentConversationsResult": {
+      "type": "object",
+      "required": [
+        "conversations"
+      ],
+      "properties": {
+        "conversations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentConversationRow"
+          }
         }
       },
       "additionalProperties": true

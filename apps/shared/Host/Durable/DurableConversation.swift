@@ -82,6 +82,7 @@ extension Conversation {
     }
 
     func submit(_ input: ConversationInput, submissionID: SubmissionID, configuration: AgentConfiguration, continuing: Bool = false) async throws -> ConversationRunResult {
+        if let binding = remoteAgent { return try await submitRemote(input, configuration: configuration, binding: binding) }
         let content = input.messages.flatMap { message -> [JSONValue] in
             if case .user = message {
                 return DurableMessageCodec.message(message, provider: configuration.client.id, profileID: scope.profileID).objectValue?["content"]?.arrayValue ?? []

@@ -31,46 +31,9 @@ actor DurableAgentHost {
         var toolHydration: ToolHydration?
         var modelAssistant: AssistantMessage?
         var assistant: AssistantMessage?
-        var partial: AssistantMessage?
+        var stream = AssistantPartial()
         var calls: [String: ToolCall] = [:]
         var results: [ToolResultMessage] = []
-        var emittedReasoning: [Int: Int] = [:]
-
-        mutating func reasoningEvents(_ assistant: AssistantMessage, completed: Bool) -> [AgentEvent] {
-            assistant.content.enumerated().compactMap { index, block in
-                guard case .thinking(let thinking) = block else { return nil }
-                let utf8 = thinking.thinking.utf8
-                let start = emittedReasoning[index] ?? 0
-                let end = completed || index < assistant.content.count - 1 ? utf8.count
-                    : thinking.thinking.range(of: "\n\n", options: .backwards).map { utf8.distance(from: utf8.startIndex, to: $0.upperBound) } ?? 0
-                guard end > start else { return nil }
-                emittedReasoning[index] = end
-                return .reasoning(String(decoding: utf8[utf8.index(utf8.startIndex, offsetBy: start)..<utf8.index(utf8.startIndex, offsetBy: end)], as: UTF8.self))
-            }
-        }
-
-        mutating func applyDeltas(_ changes: [JSONValue]) -> [AssistantEvent] {
-            guard var message = partial else { return [] }
-            var updates: [AssistantEvent] = []
-            for change in changes {
-                guard let fields = change.objectValue, let index = fields["contentIndex"]?.intValue,
-                      let delta = fields["delta"]?.stringValue, message.content.indices.contains(index) else { continue }
-                switch (fields["type"]?.stringValue, message.content[index]) {
-                case ("text_delta", .text(var block)):
-                    block.text += delta
-                    message.content[index] = .text(block)
-                    updates.append(.textDelta(index: index, delta: delta, partial: message))
-                case ("thinking_delta", .thinking(var block)):
-                    block.thinking += delta
-                    message.content[index] = .thinking(block)
-                    updates.append(.thinkingDelta(index: index, delta: delta, partial: message))
-                default:
-                    continue
-                }
-            }
-            partial = message
-            return updates
-        }
     }
     private var bindings: [Int: Binding] = [:]
     private final class FileCapability: Sendable {
@@ -426,30 +389,29 @@ actor DurableAgentHost {
         case "turn_start":
             binding.assistant = nil
             binding.results = []
-            binding.partial = nil
-            binding.emittedReasoning = [:]
+            binding.stream.reset()
             events = [.generationStarted(model: binding.configuration.model.id, turnID: binding.turnID)]
         case "message_start":
             if let value = fields["message"], value.objectValue?["role"]?.stringValue != "system" {
                 let message = try DurableMessageCodec.decode(value, scope: binding.scope, fileScope: binding.fileScope)
                 events = [.messageStart(message)]
                 if case .assistant(let assistant) = message {
-                    binding.partial = assistant
-                    events += binding.reasoningEvents(assistant, completed: false)
+                    binding.stream.message = assistant
+                    events += binding.stream.reasoningEvents(assistant, completed: false)
                     events.append(.messageUpdate(assistant, event: .start(partial: assistant)))
                 }
             }
         case "message_update":
             if let value = fields["partial"] {
                 if case .assistant(let partial) = try DurableMessageCodec.decode(value, scope: binding.scope, fileScope: binding.fileScope) {
-                    binding.partial = partial
-                    events = binding.reasoningEvents(partial, completed: false)
+                    binding.stream.message = partial
+                    events = binding.stream.reasoningEvents(partial, completed: false)
                     events.append(.messageUpdate(partial, event: .start(partial: partial)))
                 }
             } else {
-                let updates = binding.applyDeltas(fields["changes"]?.arrayValue ?? [])
-                if let partial = binding.partial {
-                    events = binding.reasoningEvents(partial, completed: false) + updates.map { .messageUpdate(partial, event: $0) }
+                let updates = binding.stream.applyDeltas(fields["changes"]?.arrayValue ?? [])
+                if let partial = binding.stream.message {
+                    events = binding.stream.reasoningEvents(partial, completed: false) + updates.map { .messageUpdate(partial, event: $0) }
                 }
             }
         case "message_end":
@@ -457,8 +419,8 @@ actor DurableAgentHost {
                 let message = try DurableMessageCodec.decode(value, scope: binding.scope, fileScope: binding.fileScope)
                 if case .assistant(let assistant) = message {
                     binding.assistant = assistant
-                    binding.partial = nil
-                    events += binding.reasoningEvents(assistant, completed: true)
+                    binding.stream.message = nil
+                    events += binding.stream.reasoningEvents(assistant, completed: true)
                     for block in assistant.content {
                         if case .toolCall(let call) = block { binding.calls[call.id] = call }
                     }

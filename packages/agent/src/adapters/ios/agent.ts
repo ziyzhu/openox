@@ -4,7 +4,7 @@ import type { Context } from "@earendil-works/chord/context";
 import { createModels, createProvider } from "@earendil-works/pi-ai/models";
 import { getCurrentSystemPrompt, getCurrentTools } from "@earendil-works/pi-ai/utils/transcript";
 import type { Model, Tool, Api, ModelThinkingLevel } from "@earendil-works/pi-ai";
-import { AgentDoc, defineExtension, defineTool, section, type EntryDraft, type UserInput, type ToolExecutionResult, type ToolExecutionMode } from "@earendil-works/pi-durable";
+import { AgentDoc, defineExtension, defineTool, type EntryDraft, type UserInput, type ToolExecutionResult, type ToolExecutionMode } from "@earendil-works/pi-durable";
 import { openProfileRuntime, type ProfileRuntime, type ConversationReference, type ConversationHistoryCursor,
   type ConversationListCursor, type ConversationIndexCursor, type PresentationChange, installOxProfile, type NormalizedProfileDraft,
   ApplicationPresentation, type ApplicationPresentationChange, type ApplicationHistoryRequest, LegacyProfileFile, ProfileFile, ProfileIndex, canonical, type TextFileMount,
@@ -20,9 +20,8 @@ import { resolveFileRequest, validateFileRequest, type FileOperation, type FileR
 import { nativeFilePayloads } from "./file-payloads";
 import { fileRequest, nativeFiles } from "./files";
 import { composeIOSPrompt } from "./prompts";
+import { composeContext, conversationSections } from "./context";
 import type { SystemPromptInput, TurnState } from "../../core/prompts";
-import { composeOxTurnSections } from "../../core/ox-prompts";
-import { filesSection } from "../../core/prompts";
 import { activeHost, sameScope, type HostScope } from "../../core/host-context";
 import { decodeBase64, encodeBase64 } from "../../core/base64";
 
@@ -38,6 +37,7 @@ interface Config { title?: string; promptState: SystemPromptInput; isolatedFiles
 type CommandScope = { profileID?: string; conversationID?: ConversationId; reference?: ConversationReference | null };
 type Command = CommandScope & (
   | { action: "composePrompt"; promptState: SystemPromptInput }
+  | { action: "composeContext"; promptState: SystemPromptInput; turnState: TurnState }
   | { action: "installProfile"; draft: NormalizedProfileDraft; conversationCount?: number }
   | { action: "open"; profileID: string; mounts?: TextFileMount[]; fileBacked?: boolean; physicalFiles?: boolean; prepareFiles?: boolean; publicFiles?: boolean }
   | { action: "attach"; config: Config }
@@ -199,6 +199,7 @@ export class IOSAgentAdapter {
     };
     const attached = () => { const ref = required(); this.route(ref.conversationID); return ref; };
     switch (args.action) {
+      case "composeContext": return composeContext(session, args.promptState, args.turnState, reference?.conversationID);
       case "schedulesRead": return readSchedules(session.harness);
       case "schedulesRecover": return recoverScheduledRuns(session.harness, session.conversations.profileID);
       case "schedulesReplace": return replaceSchedules(session.harness, args.revision, args.records, args.host);
@@ -709,20 +710,7 @@ export class IOSAgentAdapter {
       models: [{ id: config.model, provider: alias, api: "ox-native", name: config.model, baseUrl: "", reasoning: config.reasoning,
         input: ["text"], contextWindow: config.contextWindow, maxTokens: config.maxTokens,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }], api: { stream, streamSimple: stream } }));
-    const sections = Object.entries(prompt.sections).map(([key, text]) => section(key, () => text, { tag: key !== "preamble" }));
-    const turnState = async ({ conversationId, read }: Parameters<Parameters<typeof section>[1]>[0]) =>
-      (await read.snapshot(ConversationApplicationMetadata, conversationId, context))?.fields.turnState as unknown as TurnState | undefined;
-    for (const key of ["skills", "hosts", "replies", "conversation_files", "storage", "language", "attached_services", "child_conversations"] as const) {
-      sections.push(section(key, async input => {
-        const state = await turnState(input);
-        return state ? composeOxTurnSections(state, config.promptState)[key] : undefined;
-      }));
-    }
-    sections.push(section("files", async input => {
-      const state = await turnState(input);
-      return state ? filesSection(await session.rootEntries(state.fileRoots), state.grantedFolders ?? [],
-        session.files.physical ? `conversations/${conversation.id}/` : undefined) : undefined;
-    }));
+    const sections = conversationSections(session, prompt, config.promptState, conversation.id, context);
     const extension = defineExtension({ name: extensionName ?? `ox-conversation:${alias.slice(10)}`, sections,
       tools: config.tools.map(tool => defineTool({ ...tool, replay: "unsafe", executionMode: config.toolExecutionMode === "sequential" ? "sequential" : tool.executionMode ?? config.toolExecutionMode ?? "sequential",
         execute: async (arguments_, api, ctx) => this.executeNativeTool(tool.name, arguments_, api, ctx) })) });

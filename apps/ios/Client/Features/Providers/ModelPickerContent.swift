@@ -1,33 +1,5 @@
 import SwiftUI
 
-struct ModelPickerSheet: View {
-    let conversation: Conversation
-    @Environment(\.dismiss) private var dismiss
-    private var registry: ProviderRegistry { .shared }
-    private var isChoosingInitialDefault: Bool { registry.defaultModel == nil }
-
-    var body: some View {
-        NavigationStack {
-            ModelPickerContent(
-                title: isChoosingInitialDefault ? "Choose default model" : "Model for this conversation",
-                activeSelection: conversation.modelSelectionChange?.pendingSelection ?? conversation.modelSelection,
-                scopeDescription: isChoosingInitialDefault
-                    ? "Your choice will be used for this conversation and future conversations."
-                    : conversation.isBusy
-                        ? "Changes apply after the current response and stay with this conversation."
-                        : "Changes apply immediately and stay with this conversation.",
-                onClose: { dismiss() }
-            ) { client, model, selection in
-                if registry.defaultModel == nil {
-                    registry.select(model, in: client.id, region: selection.region)
-                }
-                let status = conversation.requestModelSelection(.init(client: client, model: model))
-                Log.ui.info("ModelPicker.select conversation=\(conversation.id) client=\(client.id) model=\(model.id) region=\(selection.region.rawValue) status=\(status)")
-            }
-        }
-    }
-}
-
 struct ModelPickerContent: View {
     private enum ProviderSelection: Hashable {
         case client(String)
@@ -64,6 +36,7 @@ struct ModelPickerContent: View {
     let title: LocalizedStringKey
     let activeSelection: ModelSelection
     let scopeDescription: LocalizedStringKey?
+    var header: AnyView?
     var onClose: (() -> Void)?
     private let mode: Mode
 
@@ -93,12 +66,14 @@ struct ModelPickerContent: View {
         title: LocalizedStringKey,
         activeSelection: ModelSelection,
         scopeDescription: LocalizedStringKey? = nil,
+        header: AnyView? = nil,
         onClose: (() -> Void)? = nil,
         onSelect: @escaping (any ProviderClient, ProviderModel, ModelSelection) -> Void
     ) {
         self.title = title
         self.activeSelection = activeSelection
         self.scopeDescription = scopeDescription
+        self.header = header
         self.onClose = onClose
         mode = .selection(onSelect)
         _selectedRegion = State(initialValue: activeSelection.region)
@@ -227,6 +202,7 @@ struct ModelPickerContent: View {
                             .foregroundStyle(Theme.Colors.onSurfaceMuted)
                             .settingsContentInset()
                     }
+                    if let header { header }
                     selectionGroup {
                         if !isAuthenticating {
                             regionMenu

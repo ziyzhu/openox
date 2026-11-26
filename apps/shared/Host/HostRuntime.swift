@@ -95,7 +95,8 @@ final class HostRuntime: OxHost {
                 model: summary.modelID,
                 createdAt: summary.createdAt,
                 lastActivity: summary.lastActivity,
-                active: summary.id == conversations.currentId
+                active: summary.id == conversations.currentId,
+                agent: summary.remoteAgent
             )
         }
     }

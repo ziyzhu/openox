@@ -1,6 +1,6 @@
 # Agent interface
 
-Status: proposed; no runtime changes. Separate Ox into Client, Host and Agent, so a Host conversation can run on Ox's built-in agent or on pi running on another machine, through one interface. Host↔Agent mirrors Client↔Host: a local in-process connection or a remote WebSocket JSON-RPC endpoint, and everything is a conversation.
+Status: steps 2–4 implemented and verified end to end with pi on a Mac and an iOS simulator Host; steps 1, 5 and 6 open (see Implementation status). Separate Ox into Client, Host and Agent, so a Host conversation can run on Ox's built-in agent or on pi running on another machine, through one interface. Host↔Agent mirrors Client↔Host: a local in-process connection or a remote WebSocket JSON-RPC endpoint, and everything is a conversation.
 
 ## Problem
 
@@ -260,3 +260,12 @@ Later, if wanted: let the built-in agent use a remote machine's pi providers (fo
 - Whether loading the Ox extension in a terminal pi should later report that session live to `ox agent serve`.
 - Anthropic's announced and paused change to how `claude -p` subscription use is billed, which pi-claude-code depends on.
 - How an older Host should present a conversation whose agent it does not know.
+
+## Implementation status
+
+- Shipped: `AgentConnection` split as `Conversation.submit` → `submitRemote` for remote bindings; `RemoteAgentClient` (WebSocket JSON-RPC), `RemoteAgentDirectory` (`remote-agents.json`, probe status, models, default agent); `RemoteAgentEvents` maps pi RPC events onto `AgentEvent` using the `AssistantPartial` stream shared with `DurableAgentHost`; `composeContext` renders Ox sections for remote pi; `execute` runs on the Host through `tools.call`; `agents.*` and `agentEndpoint` on `conversations.new`; `ox agent serve`, `ox agent describe`, `ox host agents`, `ox conversation new --agent`; agent button, `AgentPickerSheet`, Settings → Agents and Default agent, sidebar marker; branch, retry and edit hidden for remote conversations.
+- Ox sections are sent to pi as `ox_<key>`: pi rejects a custom `preamble` section and would replace its own `rules` and `skills`.
+- Remote turns are recorded as `ox.native.turn` entries after each run, because the projection restores turns only from entries that carry model messages.
+- Step 1 (renaming the local agent's actions to pi names) was skipped: both connections already meet at `AgentEvent`, and the rename would only churn the durable bridge.
+- Open: push notifications (needs the relay and an APNs key), agent names in background phase titles, opening a terminal-started pi session as a Host conversation (listing works through `agents.conversations`), a `tools.cancel` notification, and README/onboarding/website copy.
+

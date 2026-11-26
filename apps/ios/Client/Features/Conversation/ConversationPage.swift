@@ -6,14 +6,6 @@ import PhotosUI
 import UniformTypeIdentifiers
 import StoreKit
 
-private struct SidebarScrollLockModifier: ViewModifier {
-    @Environment(\.sidebarInteraction) private var sidebarInteraction
-
-    func body(content: Content) -> some View {
-        content.scrollDisabled(sidebarInteraction.dragActive)
-    }
-}
-
 private struct DelayedActivityKey: Equatable {
     let conversationID: UUID
     let activity: Conversation.Activity
@@ -487,7 +479,7 @@ struct ConversationPage: View {
             Group {
                 switch presented {
                 case .modelPicker:
-                    ModelPickerSheet(conversation: conversation)
+                    AgentPickerSheet(conversation: conversation)
                         .presentationDetents([.medium, .large])
                 case .serviceDetail(let service):
                     NavigationStack {
@@ -811,7 +803,8 @@ struct ConversationPage: View {
         MessageControls(
             onCopy: { text in copyMessage(text, blockId: sourceBlockID) },
             isCopied: copiedBlockId == sourceBlockID,
-            canMutate: !conversation.isBusy && !conversation.isTemporary,
+            canMutate: !conversation.isBusy && !conversation.isTemporary && conversation.remoteAgent == nil,
+            canBranch: conversation.remoteAgent == nil,
             onBranch: { alertPresentation = .branch(sourceBlockID) },
             onRetry: { alertPresentation = .retry(sourceBlockID) },
             onEdit: {

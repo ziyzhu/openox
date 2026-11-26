@@ -7,6 +7,7 @@ nonisolated struct HostConversationSummary: Sendable {
     let createdAt: Date
     let lastActivity: Date?
     let active: Bool
+    let agent: RemoteAgentBinding?
 }
 
 @MainActor

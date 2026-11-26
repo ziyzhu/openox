@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ConversationHeader<Trailing: View>: View {
     let modelTitle: String?
+    var agentTitle: String? = nil
     let iconButtonSize: CGFloat
     let onShowSidebar: () -> Void
     let onPickModel: () -> Void
@@ -11,7 +12,7 @@ struct ConversationHeader<Trailing: View>: View {
         HStack(spacing: 8) {
             SidebarMenuButton(action: onShowSidebar)
             if let modelTitle {
-                ConversationModelButton(title: modelTitle, size: iconButtonSize, action: onPickModel)
+                ConversationAgentButton(title: modelTitle, agent: agentTitle, size: iconButtonSize, action: onPickModel)
             }
             Spacer()
             trailing()

@@ -96,6 +96,16 @@ nonisolated enum A11yID {
         static let hostRemoveConfirm = "settings.host.remove.confirm"
         static func hostRemote(_ id: String) -> String { "settings.host.remote.\(id)" }
         static func hostRemove(_ id: String) -> String { "settings.host.remove.\(id)" }
+        static let agents = "settings.agents"
+        static let defaultAgent = "settings.defaultAgent"
+        static let agentAdd = "settings.agents.add"
+        static let agentAddName = "settings.agents.add.name"
+        static let agentAddEndpoint = "settings.agents.add.endpoint"
+        static let agentAddCancel = "settings.agents.add.cancel"
+        static let agentAddConfirm = "settings.agents.add.confirm"
+        static let agentRemoveConfirm = "settings.agents.remove.confirm"
+        static func agentRow(_ id: String) -> String { "settings.agents.row.\(id)" }
+        static func agentRemove(_ id: String) -> String { "settings.agents.remove.\(id)" }
         static let actions = "settings.actions"
         static let services = "settings.services"
         static let builtInActions = "settings.actions.builtIn"
@@ -181,7 +191,10 @@ nonisolated enum A11yID {
         static let openSidebar = "conversation.openSidebar"
         static let delete = "conversation.delete"
         static let export = "conversation.export"
-        static let modelPicker = "conversation.modelPicker"
+        static let agentPicker = "conversation.agentPicker"
+        static let agentMenu = "conversation.agentMenu"
+        static func agentOption(_ name: String) -> String { "conversation.agentOption.\(name)" }
+        static let agentModelMenu = "conversation.agentModelMenu"
         static let modelSetup = "conversation.modelSetup"
         static let modelAccessNotice = "conversation.modelAccessNotice"
         static let modelRegion = "conversation.modelRegion"

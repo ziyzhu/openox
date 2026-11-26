@@ -26,7 +26,11 @@ extension OxHostProtocol {
                 model: summary.model.map(JSONValue.string) ?? .null,
                 createdAt: iso(summary.createdAt),
                 lastActivity: summary.lastActivity.map { .string(iso($0)) } ?? .null,
-                active: summary.active
+                active: summary.active,
+                agent: summary.agent.map { binding in
+                    ConversationAgent(name: RemoteAgentDirectory.shared.displayName(for: binding.endpoint), endpoint: binding.endpoint.absoluteString,
+                                      conversationId: binding.conversationID, model: binding.model.map { "\($0.provider)/\($0.id)" })
+                }
             )
         }
     }
@@ -38,6 +42,14 @@ extension OxHostProtocol {
         let createdAt: String
         let lastActivity: JSONValue
         let active: Bool
+        let agent: ConversationAgent?
+    }
+
+    struct ConversationAgent: Encodable {
+        let name: String
+        let endpoint: String
+        let conversationId: String?
+        let model: String?
     }
 
     struct ListConversationsResult: Encodable {

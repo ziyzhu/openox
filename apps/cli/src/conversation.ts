@@ -95,6 +95,7 @@ async function newConversation(args: string[], context: CliContext): Promise<voi
   const result = await requireHost("conversations.new", context, options.timeoutMs, {
     ...(options.temporary ? { temporary: true } : {}),
     ...(options.provider ? { providerId: options.provider, modelId: options.model } : {}),
+    ...(options.agent ? { agentEndpoint: options.agent } : {}),
   });
   if (options.attach.length) await requireHost("debug.conversations.attachServices", context, options.timeoutMs, { domains: options.attach });
   if (options.json) console.log(JSON.stringify({ ...result, attached: options.attach }, null, 2));
@@ -203,8 +204,9 @@ function parseListOptions(args: string[], command: "list" | "stop" | "open" = "l
   return { timeoutMs, json, active, search, limit };
 }
 
-function parseNewOptions(args: string[]): { timeoutMs: number; json: boolean; temporary: boolean; provider: string; model: string; attach: string[] } {
+function parseNewOptions(args: string[]): { timeoutMs: number; json: boolean; temporary: boolean; provider: string; model: string; agent: string; attach: string[] } {
   let timeoutMs = 30000;
+  let agent = "";
   let json = false;
   let temporary = false;
   let provider = "";
@@ -218,17 +220,20 @@ function parseNewOptions(args: string[]): { timeoutMs: number; json: boolean; te
     else if (argument.startsWith("--provider=")) provider = argument.slice(11);
     else if (argument === "--model") model = requiredValue(args[++index], "--model");
     else if (argument.startsWith("--model=")) model = argument.slice(8);
+    else if (argument === "--agent") agent = requiredValue(args[++index], "--agent");
+    else if (argument.startsWith("--agent=")) agent = argument.slice(8);
     else if (argument === "--attach") attach.push(...requiredValue(args[++index], "--attach").split(","));
     else if (argument.startsWith("--attach=")) attach.push(...argument.slice(9).split(","));
     else if (argument === "--timeout") timeoutMs = positiveNumber(args[++index], "--timeout");
     else if (argument.startsWith("--timeout=")) timeoutMs = positiveNumber(argument.slice(10), "--timeout");
     else if (argument === "-h" || argument === "--help") {
-      console.log("Usage: ox [--host <url>] conversation new [--temporary] [--provider <id> --model <id>] [--attach <domain,...>] [--json] [--timeout 30000]");
+      console.log("Usage: ox [--host <url>] conversation new [--temporary] [--agent <ws-url>] [--provider <id> --model <id>] [--attach <domain,...>] [--json] [--timeout 30000]");
       console.log("       Prints the new conversation id; use ox host providers for provider and model ids.");
+      console.log("       --agent runs it on a remote agent added with ox host agents add; --provider/--model then pick that agent's model.");
       process.exit(0);
     } else fail(`unknown option: ${argument}`);
   }
-  return { timeoutMs, json, temporary, provider, model, attach: attach.filter(Boolean) };
+  return { timeoutMs, json, temporary, provider, model, agent, attach: attach.filter(Boolean) };
 }
 
 function parseSendOptions(args: string[]): { timeoutMs: number; json: boolean; wait: boolean; text: string } {

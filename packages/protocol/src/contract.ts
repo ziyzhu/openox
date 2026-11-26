@@ -51,7 +51,12 @@ export const Schemas = {
   }),
   EvaluateRequest: object("EvaluateRequest", { domain: S(), script: S() }),
   ServiceRequest: object("ServiceRequest", { domain: S() }),
-  NewConversationRequest: object("NewConversationRequest", { temporary: nullable(B()), providerId: nullable(S()), modelId: nullable(S()) }),
+  NewConversationRequest: object("NewConversationRequest", {
+    temporary: nullable(B()), providerId: nullable(S()), modelId: nullable(S()),
+    agentEndpoint: nullable(S({ minLength: 1, maxLength: 2048 })),
+  }),
+  AddAgentRequest: object("AddAgentRequest", { name: S({ minLength: 1, maxLength: 100 }), endpoint: S({ minLength: 1, maxLength: 2048 }) }),
+  AgentEndpointRequest: object("AgentEndpointRequest", { endpoint: S({ minLength: 1, maxLength: 2048 }) }),
   SendConversationRequest: object("SendConversationRequest", { conversationId: nullable(S()), text: S(), wait: nullable(B()) }),
   RespondConversationRequest: object("RespondConversationRequest", { conversationId: nullable(S()), promptId: S(), answer: S() }),
   SetKeyRequest: object("SetKeyRequest", {
@@ -92,8 +97,20 @@ export const Schemas = {
   }),
   ConversationRow: object("ConversationRow", {
     id: S(), title: S(), model: Type.Union([S(), Type.Null()]), createdAt: S(),
-    lastActivity: Type.Union([S(), Type.Null()]), active: B(),
+    lastActivity: Type.Union([S(), Type.Null()]), active: B(), agent: optional(R("ConversationAgent")),
   }),
+  ConversationAgent: object("ConversationAgent", { name: S(), endpoint: S(), conversationId: optional(S()), model: optional(S()) }),
+  AgentModelRow: object("AgentModelRow", { provider: S(), id: S(), name: S(), reasoning: B() }),
+  AgentRow: object("AgentRow", {
+    name: S(), endpoint: S(), status: S({ enum: ["checking", "online", "offline"] }), implementation: optional(S()),
+    version: optional(S()), machine: optional(S()), folder: optional(S()), error: optional(S()), models: A(R("AgentModelRow")),
+  }),
+  ListAgentsResult: object("ListAgentsResult", { agents: A(R("AgentRow")) }),
+  AgentResult: object("AgentResult", { agent: R("AgentRow") }),
+  AgentConversationRow: object("AgentConversationRow", {
+    id: S(), title: S(), cwd: S(), state: S(), origin: S(), updatedAt: S(), hostConversationId: optional(S()),
+  }),
+  ListAgentConversationsResult: object("ListAgentConversationsResult", { conversations: A(R("AgentConversationRow")) }),
   ListConversationsResult: object("ListConversationsResult", { conversations: A(R("ConversationRow")) }),
   ConversationTool: object("ConversationTool", { name: S(), description: S(), parameters: Type.Unknown(), strict: B() }),
   ConversationSnapshot: object("ConversationSnapshot", {
@@ -178,6 +195,10 @@ export const Methods = {
   "conversations.send": method("sendConversation", "SendConversationRequest", "SendConversationResult"),
   "conversations.stop": method("stopConversation", "ConversationRequest", "StopConversationResult"),
   "providers.list": method("listProviders", "EmptyRequest", "ListProvidersResult"),
+  "agents.list": method("listAgents", "EmptyRequest", "ListAgentsResult"),
+  "agents.add": method("addAgent", "AddAgentRequest", "AgentResult"),
+  "agents.remove": method("removeAgent", "AgentEndpointRequest", "EmptyResult"),
+  "agents.conversations": method("listAgentConversations", "AgentEndpointRequest", "ListAgentConversationsResult"),
   "logs.list": method("getLogs", "GetLogsRequest", "GetLogsResult"),
   "debug.composer.formatting": method("getComposerFormatting", "EmptyRequest", "ComposerFormattingResult"),
   "debug.repositories.saveGate": method("repositoryGate", "RepositoryGateRequest", "RepositorySaveGateResult"),

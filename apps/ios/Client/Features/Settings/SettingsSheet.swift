@@ -151,6 +151,8 @@ struct SettingsSheet: View {
                         .accessibilityIdentifier(A11yID.Settings.defaultModel)
                     }
 
+                    AgentSettingsSection()
+
                     capabilitiesSettingsSection
 
                     HostSettingsSection()

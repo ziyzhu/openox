@@ -48,6 +48,7 @@ final class Conversation: Identifiable {
     let serviceManager: ServiceManager
     let fileMutationCoordinator = FileMutationCoordinator.shared
     private(set) var retention: ConversationRetention
+    var remoteAgent: RemoteAgentBinding? { didSet { if remoteAgent != oldValue { onPersistableChange?() } } }
 
     var isTemporary: Bool { retention == .temporary }
     var canChangeRetention: Bool { transcript.isEmpty && queuedMessages.isEmpty && !isBusy }
@@ -58,6 +59,7 @@ final class Conversation: Identifiable {
             return false
         }
         retention = isTemporary ? .persisted : .temporary
+        remoteAgent = isTemporary ? nil : RemoteAgentDirectory.shared.defaultBinding
         Log.session.info("Conversation.retention changed id=\(id) retention=\(String(describing: retention))")
         return true
     }
@@ -792,6 +794,7 @@ final class Conversation: Identifiable {
         self.executionLease = executionLease
         self.model = model
         self.monoRepositoryHash = serviceManager.monoRepositoryHash
+        remoteAgent = parentID == nil && scheduleID == nil && retention == .persisted ? RemoteAgentDirectory.shared.defaultBinding : nil
         Log.session.info("Conversation created id=\(id) client=\(client.id) model=\(model.id) reasoning=\(model.selectedReasoningEffort ?? "unavailable") region=\(selection.region.rawValue) server=\(serviceManager.serverURL.absoluteString)")
     }
 
@@ -889,6 +892,7 @@ final class Conversation: Identifiable {
         let recovered = document.turns != turns
         hasUnreadResponse = meta.hasUnreadResponse
         childIDs = meta.childIDs
+        remoteAgent = meta.remoteAgent
         serviceAttachments.restore(meta.attachedServiceDomains)
         lastActivityAt = meta.lastActivity
         Log.session.info("Conversation restored id=\(meta.id) turns=\(turns.count) blocks=\(transcript.count) services=\(attachedServices.count) recovered=\(recovered) context=pending")
@@ -909,7 +913,8 @@ final class Conversation: Identifiable {
             scheduleID: scheduleID,
             parentID: parentID,
             childIDs: childIDs,
-            lastMessageAt: lastMessageAt
+            lastMessageAt: lastMessageAt,
+            remoteAgent: remoteAgent
         )
     }
 
@@ -1290,7 +1295,7 @@ final class Conversation: Identifiable {
     }
 
     func branchSnapshot(at blockId: UUID) -> ConversationContinuation? {
-        guard let target = document.turnIndex(containingBlock: blockId) else { return nil }
+        guard remoteAgent == nil, let target = document.turnIndex(containingBlock: blockId) else { return nil }
         return continuation(
             before: target + 1,
             intent: "",
@@ -1944,46 +1949,5 @@ final class Conversation: Identifiable {
         let memory = UserMemory.shared.text
         memorySnapshot = memory
         Log.session.info("Conversation.memorySnapshot id=\(id) chars=\(memory.count)")
-    }
-
-    func agentConfiguration(client: any ProviderClient, model: ProviderModel) -> AgentConfiguration {
-        let conversationID = id
-        return AgentConfiguration(
-            client: client,
-            model: model,
-            promptState: ConversationPromptState.system(memory: systemPromptMemory, hostID: Device.hostID, profileID: scope.profileID?.uuidString ?? "temporary:\(scope.generation.uuidString)"),
-            tools: [ConversationTool(conversation: self)],
-            streamOptions: StreamOptions(sessionID: conversationID.uuidString),
-            transformContext: { request in
-                return await ModelAdapterPipeline.transform(
-                    messages: request.messages,
-                    model: request.model,
-                    loadsFilesLazily: client.supportsTools(for: request.model),
-                    wireProtocol: client.wireProtocol(for: request.model)
-                )
-            }
-        )
-    }
-}
-
-extension Conversation: PrivateDataHost {
-    var privateDataContext: PrivateDataAccessContext {
-        PrivateDataAccessContext(
-            conversationRetention: retention,
-            provider: .init(id: client.id, name: client.displayName, location: client.inferenceLocation)
-        )
-    }
-
-    func choosePrivateDataOption(prompt: String, options: [String]) async -> String {
-        await awaitPrompt(
-            prompt: prompt,
-            options: options,
-            allowsCustomAnswer: false,
-            presentation: .application
-        )
-    }
-
-    func continuePrivateDataTemporarily(_ continuation: ConversationContinuation) {
-        onPrivateDataTemporaryContinuation?(continuation)
     }
 }
