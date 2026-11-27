@@ -16,7 +16,7 @@ struct ConversationPageTopBar: View {
     var body: some View {
         ConversationHeader(
             title: conversation.title,
-            agentTitle: agentTitle,
+            agentTitle: conversation.remoteAgentName ?? Device.localAgentName,
             agentStatus: conversation.remoteAgent.map { RemoteAgentDirectory.shared.statuses[$0.endpoint] ?? .checking },
             parent: parent,
             iconButtonSize: iconButtonSize,
@@ -33,15 +33,6 @@ struct ConversationPageTopBar: View {
             guard let endpoint = conversation.remoteAgent?.endpoint else { return }
             await RemoteAgentDirectory.shared.refresh(endpoint)
         }
-    }
-
-    private var agentTitle: String {
-        guard conversation.remoteAgent != nil else {
-            let registry = ProviderRegistry.shared
-            let model = registry.model(for: conversation.modelSelection, client: registry.client(for: conversation.modelSelection))
-            return "\(Device.localAgentName) · \(model.displayName)"
-        }
-        return [conversation.remoteAgentName, conversation.remoteModelName].compactMap(\.self).joined(separator: " · ")
     }
 
     private func overflowMenu(conversation: Conversation) -> some View {
