@@ -399,7 +399,6 @@ private struct SidebarRowButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                     .fill(Theme.Colors.onSurface.opacity(tinted ? 0.08 : 0))
             }
-            .pressedSurface(configuration.isPressed, dims: false)
             .padding(.horizontal, edgeInset - Theme.Spacing.sm)
             .padding(.vertical, 2)
             .contentShape(Rectangle())
