@@ -363,6 +363,7 @@ struct RootView: View {
                 case .active:
                     if startup == .deferred { bootstrap() }
                     conversations.current?.setTranscriptVisible(true)
+                    Task { await RemoteAgentDirectory.shared.refreshOffline() }
                     Task {
                         await storage.revalidateActive()
                         monitorActiveProfile()

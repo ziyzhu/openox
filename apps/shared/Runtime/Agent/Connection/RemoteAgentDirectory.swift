@@ -143,7 +143,8 @@ final class RemoteAgentDirectory {
     private func markDisconnected(_ endpoint: URL, reason: String) {
         guard statuses[endpoint]?.isOnline == true else { return }
         statuses[endpoint] = .offline(reason)
-        Log.agent.info("RemoteAgentDirectory.disconnected endpoint=\(endpoint.absoluteString)")
+        Log.agent.info("RemoteAgentDirectory.disconnected endpoint=\(endpoint.absoluteString) reconnecting=true")
+        Task { await refresh(endpoint) }
     }
 
     @discardableResult
@@ -184,8 +185,16 @@ final class RemoteAgentDirectory {
     }
 
     func refreshUnknown() async {
+        await refresh { $0 == nil || $0 == .checking }
+    }
+
+    func refreshOffline() async {
+        await refresh { if case .offline = $0 { true } else { false } }
+    }
+
+    private func refresh(where matches: (RemoteAgentStatus?) -> Bool) async {
         await withTaskGroup(of: Void.self) { group in
-            for agent in configuration.agents where statuses[agent.endpoint].map({ $0 == .checking }) ?? true {
+            for agent in configuration.agents where matches(statuses[agent.endpoint]) {
                 group.addTask { await self.refresh(agent.endpoint) }
             }
         }
