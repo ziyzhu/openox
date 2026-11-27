@@ -32,7 +32,7 @@ nonisolated enum JavaScriptOutputLimits {
 
 actor JavaScriptOutputStore {
     private let directory = FileManager.default.temporaryDirectory.appendingPathComponent("ox-output-\(UUID().uuidString)")
-    private var storedBytes = 0
+    private var saved: [(name: String, bytes: Int)] = []
 
     deinit {
         let directory = directory
@@ -43,13 +43,18 @@ actor JavaScriptOutputStore {
 
     func save(_ text: String) throws -> String {
         let data = Data(text.utf8)
-        guard storedBytes + data.count <= FileLimits.fileBytes else {
+        guard data.count <= FileLimits.fileBytes else {
             throw RuntimeError.bridge(ModelGuidance.text("output.cacheExceeded"))
+        }
+        while saved.reduce(0, { $0 + $1.bytes }) + data.count > FileLimits.fileBytes, !saved.isEmpty {
+            let oldest = saved.removeFirst()
+            try? FileManager.default.removeItem(at: directory.appendingPathComponent(oldest.name))
+            Log.session.info("output.evict name=\(oldest.name) bytes=\(oldest.bytes) incomingBytes=\(data.count)")
         }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let id = UUID().uuidString + ".txt"
         try data.write(to: directory.appendingPathComponent(id), options: .atomic)
-        storedBytes += data.count
+        saved.append((id, data.count))
         return "/tmp/" + id
     }
 
@@ -63,6 +68,10 @@ actor JavaScriptOutputStore {
             }
         }
         let url = name.map { directory.appendingPathComponent($0) }
+        if let name, let url, !FileManager.default.fileExists(atPath: url.path) {
+            Log.session.info("output.expired name=\(name) operation=\(operation)")
+            throw RuntimeError.bridge(ModelGuidance.text("output.expired"))
+        }
         func info(_ name: String, size: Int) -> JSONValue {
             .object(["path": .string("tmp/" + name), "name": .string(name), "kind": .string("file"),
                      "size": .int(size), "mtimeMs": .int(0)])

@@ -223,7 +223,7 @@ function buildUnits(): Unit[] {
     textUnit("runtime.truncation", "Runtime messages", "Output truncation", locate(runtimeFile, "Tool output truncated"), "runtime",
       outputTruncation({ path: "{path}", maxLines: 999002, maxBytes: 999003 * 1024 }).trim().replaceAll("999002", "{maxLines}").replaceAll("999003", "{maxKiB}")),
     textUnit("runtime.imageRead", "Runtime messages", "Image read guidance", locate(runtimeFile, "for local OCR"), "runtime", imageReadGuidance({ path: "{path}" })),
-    ...["image.fileRead", "file.conversion", "output.cacheExceeded"].map(key => textUnit(`runtime.${key}`, "Runtime messages", key, locate(guidanceFile, `"${key}"`), "runtime", guidanceTexts[key]!)),
+    ...["image.fileRead", "file.conversion", "output.cacheExceeded", "output.expired"].map(key => textUnit(`runtime.${key}`, "Runtime messages", key, locate(guidanceFile, `"${key}"`), "runtime", guidanceTexts[key]!)),
   );
   return units;
 }
