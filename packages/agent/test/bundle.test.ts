@@ -64,10 +64,10 @@ it("shares the core across hosts and rejects ambiguous ownership in the shipped 
   expect(() => runInContext("OxPrompts.composeOxPrompt({...input,deviceContext:{...input.deviceContext,active:{deviceID:'wrong',profileID:'profile-a'}}})", realm)).toThrow("unavailable");
   expect(() => runInContext("OxPrompts.composeOxPrompt({...input,deviceContext:{...input.deviceContext,devices:[...input.deviceContext.devices,...input.deviceContext.devices]}})", realm)).toThrow("Duplicate");
   expect(runInContext("OxPrompts.composeOxPrompt({...input,deviceContext:{...input.deviceContext,devices:[{...input.deviceContext.devices[0],functions:['ox'],serviceKinds:['web','api','ios','mcp'],presentation:'conversation-bubbles',externalFiles:true}]}}).rendered", realm)).toBe(prompt);
-  realm.guide = { catalog: "ox.fs.read", timeoutSeconds: 10, maxLines: 100, maxBytes: 2048, canCancelLoops: true };
+  realm.guide = { catalog: "ox.fs.read", timeoutSeconds: 10, maxOutputTokens: 100, canCancelLoops: true };
   const guide = runInContext("OxPrompts.executeGuidance(guide)", realm) as string;
   expect(guide).toContain("10 seconds");
-  expect(guide).toContain("100 lines or 2 KiB");
+  expect(guide).toContain("about 100 tokens");
   expect(guide).toContain("ox.service.inspect");
   expect(guide).toContain("ox.web.browser.showPage");
   expect(guide).toContain("declare namespace ox.web");

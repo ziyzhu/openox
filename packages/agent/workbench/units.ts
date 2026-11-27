@@ -30,8 +30,7 @@ const catalogNamespaces = ["conversation", "provider", "repository", "secret", "
 const catalogSentinel = "\u0000CATALOG\u0000";
 const nativeFacts = [
   ["timeoutSeconds", "apps/shared/Runtime/VM/VirtualMachine.swift", /defaultTimeout: TimeInterval = ([\d_]+)/],
-  ["maxLines", "apps/shared/Runtime/Conversations/JavaScriptOutputStore.swift", /static let maxLines = ([\d_]+)/],
-  ["maxKiB", "apps/shared/Runtime/Conversations/JavaScriptOutputStore.swift", /static let maxBytes = ([\d_]+) \* 1024/],
+  ["maxOutputTokens", "apps/shared/Runtime/Conversations/JavaScriptOutputStore.swift", /static let maxOutputTokens = ([\d_]+)/],
   ["maxFetches", "apps/shared/Runtime/Services/Web/WebFunctions.swift", /static let maxFetches = ([\d_]+)/],
   ["maxTransientAttachments", "apps/shared/Runtime/Services/Web/WebFunctions.swift", /static let maxTransientAttachments = ([\d_]+)/],
 ] as const;
@@ -41,8 +40,8 @@ const limits = Object.fromEntries(nativeFacts.map(([key, file, pattern]) => {
   return [key, Number(match[1]!.replaceAll("_", ""))];
 })) as Record<typeof nativeFacts[number][0], number>;
 const sentinels: [string, string, string][] = [
-  ["999001", "{timeoutSeconds}", String(limits.timeoutSeconds)], ["999002", "{maxLines}", String(limits.maxLines)],
-  ["999003", "{maxKiB}", String(limits.maxKiB)], ["999004", "{maxFetches}", countWords[limits.maxFetches] ?? String(limits.maxFetches)],
+  ["999001", "{timeoutSeconds}", String(limits.timeoutSeconds)], ["999002", "{maxOutputTokens}", String(limits.maxOutputTokens)],
+  ["999004", "{maxFetches}", countWords[limits.maxFetches] ?? String(limits.maxFetches)],
   ["999005", "{maxTransientAttachments}", countWords[limits.maxTransientAttachments] ?? String(limits.maxTransientAttachments)],
 ];
 const languageExample = { identifier: "zh-Hans", name: "Simplified Chinese" };
@@ -81,7 +80,7 @@ function readContracts() {
 export const contracts = readContracts();
 
 function executeTemplate() {
-  const raw = executeGuidance({ catalog: catalogSentinel, timeoutSeconds: 999001, maxLines: 999002, maxBytes: 999003 * 1024, maxFetches: 999004, maxTransientAttachments: 999005 });
+  const raw = executeGuidance({ catalog: catalogSentinel, timeoutSeconds: 999001, maxOutputTokens: 999002, maxFetches: 999004, maxTransientAttachments: 999005 });
   const template = sentinels.reduce((value, [sentinel, placeholder]) => value.replaceAll(sentinel, placeholder), raw);
   const paragraphs: string[] = [];
   let open = false;
@@ -221,7 +220,7 @@ function buildUnits(): Unit[] {
     textUnit("runtime.receipt", "Runtime messages", "Failure receipt (example)", locate(runtimeFile, "Execution receipt"), "runtime",
       failureReceipt({ invocations: [{ id: "c1", name: "ox.service.invoke", state: "succeeded" }, { id: "c2", name: "ox.fs.write", state: "failed" }, { id: "c3", name: "ox.web.fetch", state: "running" }], omittedCalls: 2 }), undefined, false),
     textUnit("runtime.truncation", "Runtime messages", "Output truncation", locate(runtimeFile, "Tool output truncated"), "runtime",
-      outputTruncation({ path: "{path}", maxLines: 999002, maxBytes: 999003 * 1024 }).trim().replaceAll("999002", "{maxLines}").replaceAll("999003", "{maxKiB}")),
+      outputTruncation({ head: "{head}", tail: "{tail}", originalTokens: 999001, totalLines: 999002, truncatedTokens: 999003, path: "{path}", saveError: null }).replaceAll("999001", "{originalTokens}").replaceAll("999002", "{totalLines}").replaceAll("999003", "{truncatedTokens}")),
     textUnit("runtime.imageRead", "Runtime messages", "Image read guidance", locate(runtimeFile, "for local OCR"), "runtime", imageReadGuidance({ path: "{path}" })),
     ...["image.fileRead", "file.conversion", "output.cacheExceeded", "output.expired"].map(key => textUnit(`runtime.${key}`, "Runtime messages", key, locate(guidanceFile, `"${key}"`), "runtime", guidanceTexts[key]!)),
   );

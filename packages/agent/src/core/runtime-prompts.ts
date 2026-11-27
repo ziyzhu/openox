@@ -1,6 +1,6 @@
 export type RuntimeEvent = { type: "serviceLogin"; domain: string; authorized: boolean } | { type: "backgroundInterrupted" };
 export interface ReceiptInvocation { id: string; name: string; state: "succeeded" | "failed" | "running" }
-export interface OutputTruncation { path: string; maxLines: number; maxBytes: number }
+export interface OutputTruncation { head: string; tail: string; originalTokens: number; totalLines: number; truncatedTokens: number; path: string | null; saveError: string | null }
 
 export function runtimeEvent(event: RuntimeEvent) {
   switch (event?.type) {
@@ -39,8 +39,13 @@ export function failureReceipt(input: { invocations: ReceiptInvocation[]; omitte
 }
 
 export function outputTruncation(input: OutputTruncation) {
-  if (typeof input?.path !== "string" || !Number.isSafeInteger(input.maxLines) || input.maxLines < 1 || !Number.isSafeInteger(input.maxBytes) || input.maxBytes < 1) throw new Error("Invalid output truncation state");
-  return `\n[Tool output truncated: showing the tail (${input.maxLines} lines or ${Math.floor(input.maxBytes / 1024)} KiB limit). Full output file: ${input.path}. Read with ox.fs.read({ purpose: 'Read remaining output', path: '${input.path}', offset: 1 }), then follow the returned offset hint or search with ox.fs.grep. This file preserves emitted output, not content omitted by an upstream tool. Retrieved output is not evidence that all passages were read. File expires when this conversation is unloaded or newer output needs space.]`;
+  const counts = [input?.originalTokens, input?.totalLines, input?.truncatedTokens];
+  if (typeof input?.head !== "string" || typeof input.tail !== "string" || !counts.every(value => Number.isSafeInteger(value) && value! >= 0)
+    || (typeof input.path === "string") === (typeof input.saveError === "string")) throw new Error("Invalid output truncation state");
+  const file = input.path !== null
+    ? `[Full output: ${input.path} (read with ox.fs.read offset/limit or search with ox.fs.grep). This file preserves emitted output, not content omitted by an upstream tool. Retrieved output is not evidence that all passages were read. File expires when this conversation is unloaded or newer output needs space.]`
+    : `[Could not save the full output: ${input.saveError}]`;
+  return `Warning: truncated output (original token count: ${input.originalTokens})\nTotal output lines: ${input.totalLines}\n\n${input.head}…${input.truncatedTokens} tokens truncated…${input.tail}\n\n${file}`;
 }
 
 export function imageReadGuidance(input: { path: string }) {

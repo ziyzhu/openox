@@ -50,12 +50,12 @@ const standardActionDeclarations = Object.entries(standardServiceActions).map(([
 export const countWords = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 const countWord = (value: number) => countWords[value] ?? String(value);
 export interface ExecuteGuidanceInput {
-  catalog: string; timeoutSeconds: number; maxLines: number; maxBytes: number;
+  catalog: string; timeoutSeconds: number; maxOutputTokens: number;
   maxFetches?: number; maxTransientAttachments?: number; canCancelLoops?: boolean;
 }
 
 export function executeGuidance(input: ExecuteGuidanceInput) {
-  if (typeof input?.catalog !== "string" || ![input.timeoutSeconds, input.maxLines, input.maxBytes].every(value => Number.isSafeInteger(value) && value > 0)
+  if (typeof input?.catalog !== "string" || ![input.timeoutSeconds, input.maxOutputTokens].every(value => Number.isSafeInteger(value) && value > 0)
     || ![input.maxFetches ?? 8, input.maxTransientAttachments ?? 4].every(value => Number.isSafeInteger(value) && value >= 0)) throw new Error("Invalid execution guidance facts");
   return [
     "Run JavaScript as an async function body. Top-level await and return work. Emit text with console.log or return. Use await image(block) to send a Base64 image block from ox.fs.read or an image data URL to the model, not the conversation UI; it does not save a file or fetch remote URLs. Images share the transient attachment limits. Do not print Base64. Use only exposed capabilities; no shell, Node, or direct filesystem access.",
@@ -68,6 +68,6 @@ export function executeGuidance(input: ExecuteGuidanceInput) {
     `Batch independent reads with Promise.allSettled and chain predictable dependent steps, stopping on failure. Filter large results before printing; return to the model only when evidence requires a decision. Serialize writes and approval-dependent calls. Await needed calls; pending calls are cancelled at script exit. Effects are not rolled back on failure. Preserve error code, message, and recovery with console.error(error) or return; verify uncertain effects before retrying writes.`,
     `Each execution is self-contained; never store continuation state on globalThis. Return concise progress or persist it through an authorized file. Use bounded loops. The active execution limit is ${input.timeoutSeconds} seconds. ${input.canCancelLoops ? "The runtime supports interrupting JavaScript loops." : "Cancellation does not forcibly stop an infinite JavaScript loop."}`,
     `Service actions and user handoffs do not consume active execution time. Each execution may fetch at most ${countWord(input.maxFetches ?? 8)} public resources and add at most ${countWord(input.maxTransientAttachments ?? 4)} transient attachments; presented files do not count toward that attachment limit.`,
-    `Combined console and return output is limited to the last ${input.maxLines} lines or ${Math.floor(input.maxBytes / 1024)} KiB, whichever is reached first. A clipped preview is incomplete. Full output is saved in a read-only conversation-local /tmp file until the conversation unloads or newer output needs space; inspect it with ox.fs.read or ox.fs.grep. File pagination is a separate limit.`,
+    `Combined console and return output is limited to about ${input.maxOutputTokens} tokens; longer output keeps its start and end and omits the middle. A clipped preview is incomplete. Full output is saved in a read-only conversation-local /tmp file until the conversation unloads or newer output needs space; inspect it with ox.fs.read or ox.fs.grep. File pagination is a separate limit.`,
   ].join("\n\n");
 }

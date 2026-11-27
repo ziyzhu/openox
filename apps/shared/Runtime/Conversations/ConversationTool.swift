@@ -41,8 +41,7 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
         ModelGuidance.execute(
             catalog: OxFunctionCatalog.descriptions(),
             timeoutSeconds: Int(VirtualMachine.defaultTimeout),
-            maxLines: JavaScriptOutputLimits.maxLines,
-            maxBytes: JavaScriptOutputLimits.maxBytes,
+            maxOutputTokens: JavaScriptOutputLimits.maxOutputTokens,
             maxFetches: WebExecutionLimits.maxFetches,
             maxTransientAttachments: WebExecutionLimits.maxTransientAttachments
         )
@@ -105,7 +104,7 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
         }
         diagnosticContent = output.truncated ? nil : await logOutput(logs: logs, error: failure)
         let failed = failure != nil
-        Log.session.info("tool.output maxBytes=\(JavaScriptOutputLimits.maxBytes) maxLines=\(JavaScriptOutputLimits.maxLines) outputBytes=\(output.text.utf8.count) truncated=\(output.truncated)")
+        Log.session.info("tool.output maxOutputTokens=\(JavaScriptOutputLimits.maxOutputTokens) outputBytes=\(output.text.utf8.count) truncated=\(output.truncated)")
         if failed, let note = failureNote?(failure ?? output.text) { try? session.appendReportedProgress(note) }
         session.finishExecution(output: output.text, isError: failed)
         return ToolResult(
@@ -138,18 +137,27 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
         if let error { lines.append("[error] \(error)") }
         let output = lines.joined(separator: "\n")
         guard !output.isEmpty else { return ModelOutput(text: "(no output)", truncated: false) }
-        let preview = JavaScriptOutputLimits.preview(output)
-        guard preview != output else {
+        guard let excerpt = JavaScriptOutputLimits.excerpt(output) else {
             return ModelOutput(text: output, truncated: false)
         }
-        let path = try await store.save(output)
-        let marker = try ModelPromptRenderer.shared.render(.outputTruncation, input: .object([
-            "path": .string(path), "maxLines": .int(JavaScriptOutputLimits.maxLines), "maxBytes": .int(JavaScriptOutputLimits.maxBytes),
+        var path = JSONValue.null
+        var saveError = JSONValue.null
+        do {
+            path = .string(try await store.save(output))
+        } catch {
+            Log.session.error("tool.output save failed outputBytes=\(output.utf8.count) error=\(error.localizedDescription)")
+            saveError = .string(error.localizedDescription)
+        }
+        let characters = output.utf16.count
+        let omitted = characters - excerpt.head.utf16.count - excerpt.tail.utf16.count
+        let text = try ModelPromptRenderer.shared.render(.outputTruncation, input: .object([
+            "head": .string(String(excerpt.head)), "tail": .string(String(excerpt.tail)),
+            "originalTokens": .int(JavaScriptOutputLimits.tokens(characters: characters)),
+            "totalLines": .int(output.utf8.reduce(1) { $0 + ($1 == 10 ? 1 : 0) }),
+            "truncatedTokens": .int(JavaScriptOutputLimits.tokens(characters: omitted)),
+            "path": path, "saveError": saveError,
         ]))
-        let boundedPreview = JavaScriptOutputLimits.preview(output,
-            maxLines: JavaScriptOutputLimits.maxLines - marker.filter { $0 == "\n" }.count,
-            maxBytes: JavaScriptOutputLimits.maxBytes - marker.utf8.count)
-        return ModelOutput(text: boundedPreview + marker, truncated: true)
+        return ModelOutput(text: text, truncated: true)
     }
 
     @concurrent

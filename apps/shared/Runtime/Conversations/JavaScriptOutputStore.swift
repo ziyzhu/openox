@@ -1,32 +1,20 @@
 import Foundation
 
 nonisolated enum JavaScriptOutputLimits {
-    static let maxBytes = 50 * 1024
-    static let maxLines = 2_000
+    static let maxOutputTokens = 10_000
+    static let charactersPerToken = 4
 
-    static func preview(_ text: String, maxLines: Int = maxLines, maxBytes: Int = maxBytes) -> String {
-        let bytes = text.utf8
-        if bytes.count <= maxBytes {
-            let lines = bytes.reduce(0) { $0 + ($1 == 10 ? 1 : 0) } + (bytes.last == 10 ? 0 : 1)
-            if lines <= maxLines { return text }
-        }
-        let end = bytes.last == 10 ? bytes.index(before: bytes.endIndex) : bytes.endIndex
-        var start = end
-        var keptStart = end
-        for line in 0..<maxLines {
-            let lineStart = bytes[..<start].lastIndex(of: 10).map { bytes.index(after: $0) } ?? bytes.startIndex
-            guard bytes.distance(from: lineStart, to: end) <= maxBytes else {
-                if line == 0 {
-                    keptStart = bytes.index(end, offsetBy: -maxBytes)
-                    while bytes[keptStart] & 0xc0 == 0x80 { keptStart = bytes.index(after: keptStart) }
-                }
-                break
-            }
-            keptStart = lineStart
-            guard lineStart > bytes.startIndex else { break }
-            start = bytes.index(before: lineStart)
-        }
-        return String(decoding: bytes[keptStart..<end], as: UTF8.self)
+    static func tokens(characters: Int) -> Int {
+        (characters + charactersPerToken - 1) / charactersPerToken
+    }
+
+    static func excerpt(_ text: String) -> (head: Substring, tail: Substring)? {
+        let budget = maxOutputTokens * charactersPerToken
+        let characters = text.utf16
+        guard characters.count > budget else { return nil }
+        let headEnd = characters.index(characters.startIndex, offsetBy: budget / 2)
+        let tailStart = characters.index(characters.endIndex, offsetBy: -(budget - budget / 2))
+        return (text[..<headEnd], text[tailStart...])
     }
 }
 

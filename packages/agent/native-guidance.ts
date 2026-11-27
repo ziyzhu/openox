@@ -10,9 +10,9 @@ export function nativeGuidanceSource() {
   const entries = Object.entries(guidanceTexts).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
     .map(([key, value]) => `        ${swiftString(key)}: ${swiftString(value)},`).join("\n");
   const execute = () => swiftString(executeGuidance({ catalog: "__OX_CATALOG__",
-    timeoutSeconds: 999001, maxLines: 999002, maxBytes: 999003 * 1024, maxFetches: 999004, maxTransientAttachments: 999005 }))
+    timeoutSeconds: 999001, maxOutputTokens: 999002, maxFetches: 999004, maxTransientAttachments: 999005 }))
     .replaceAll("__OX_CATALOG__", "\\(catalog)").replaceAll("999001", "\\(timeoutSeconds)")
-    .replaceAll("999002", "\\(maxLines)").replaceAll("999003", "\\(maxBytes / 1024)")
+    .replaceAll("999002", "\\(maxOutputTokens)")
     .replaceAll("999004", "\\(word(maxFetches))").replaceAll("999005", "\\(word(maxTransientAttachments))");
   return `import Foundation
 
@@ -45,7 +45,7 @@ ${entries}
         words.indices.contains(value) ? words[value] : String(value)
     }
 
-    static func execute(catalog: String, timeoutSeconds: Int, maxLines: Int, maxBytes: Int, maxFetches: Int, maxTransientAttachments: Int) -> String {
+    static func execute(catalog: String, timeoutSeconds: Int, maxOutputTokens: Int, maxFetches: Int, maxTransientAttachments: Int) -> String {
         return ${execute()}
     }
 }
