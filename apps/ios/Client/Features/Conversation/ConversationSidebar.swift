@@ -169,6 +169,7 @@ struct ConversationSidebar: View {
             }
             .animation(.smooth(duration: 0.35), value: lastDeletedID)
             .padding(.top, Theme.Spacing.xs)
+            .background(ImmediateScrollTouches())
         }
         .scrollIndicators(.hidden)
         .scrollEdgeEffectStyle(.soft, for: .top)
