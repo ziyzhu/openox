@@ -149,6 +149,7 @@ extension Conversation {
             let running = fields["state"]?.stringValue == "running"
             Log.session.info("Conversation.remote attached id=\(id) since=\(since) seq=\(seq) running=\(running) replay=\(fields["replay"]?.stringValue ?? "none")")
             if fields["replay"]?.stringValue != "complete" || seq < since {
+                if remoteAgent?.conversationID == conversationID { remoteAgent?.lastSeq = seq }
                 result = ConversationRunResult(outcome: .failed(message: Self.remoteEndedAway, kind: .provider))
             } else if seq == since, !running {
                 result = ConversationRunResult(outcome: .failed(message: String(localized: "This message didn't reach the agent. Send it again."), kind: .provider))
@@ -308,7 +309,8 @@ extension Conversation {
                 guard !client.isConnected else { continue }
                 switch await reconnectRemote(client: client, session: session, since: lastSeq) {
                 case .resumed(let seq): lastSeq = seq
-                case .ended(let message):
+                case .ended(let message, let seq):
+                    lastSeq = seq
                     return ConversationRunResult(outcome: .failed(message: message, kind: .provider))
                 case .unreachable:
                     return remoteFailure(RemoteAgentError.disconnected(reason))
@@ -353,7 +355,7 @@ extension Conversation {
                 let restarted = seq < (since ?? 0)
                 Log.session.info("Conversation.remote reconnected id=\(id) attempt=\(attempt) since=\(since ?? -1) seq=\(seq) replay=\(replay) restarted=\(restarted)")
                 guard replay == "gap" || restarted else { return .resumed(seq: since) }
-                if fields["state"]?.stringValue == "idle" || restarted { return .ended(Self.remoteEndedAway) }
+                if fields["state"]?.stringValue == "idle" || restarted { return .ended(Self.remoteEndedAway, seq: seq) }
                 return .resumed(seq: seq)
             } catch {
                 Log.session.info("Conversation.remote reconnect id=\(id) attempt=\(attempt) error=\(LogPrivacy.text(error.localizedDescription, limit: 200))")
@@ -572,7 +574,7 @@ nonisolated enum RemoteTurnRecord: Sendable {
 
 nonisolated enum RemoteReconnect: Sendable {
     case resumed(seq: Int?)
-    case ended(String)
+    case ended(String, seq: Int)
     case unreachable
 }
 
