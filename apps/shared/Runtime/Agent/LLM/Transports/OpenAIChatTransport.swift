@@ -315,6 +315,11 @@ public struct OpenAIChatTransport: ProviderClient {
                     switch fr {
                     case "tool_calls": stopReason = .toolUse
                     case "length": stopReason = .length
+                    case "content_filter":
+                        Log.network.error("\(label) finish_reason=content_filter genId=\(genId)")
+                        assembler.fail("The provider stopped this reply because its content filter flagged it.")
+                        failed = true
+                        return false
                     case "error":
                         Log.network.error("\(label) finish_reason=error genId=\(genId)")
                         assembler.fail("stream ended with finish_reason=error")

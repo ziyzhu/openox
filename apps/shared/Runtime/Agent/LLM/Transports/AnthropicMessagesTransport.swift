@@ -232,6 +232,12 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
             case "message_delta":
                 if let delta = event["delta"] as? [String: Any], let raw = delta["stop_reason"] as? String {
                     assembler.setRawStopReason(raw)
+                    if let failure = stopFailure(raw, details: delta["stop_details"] as? [String: Any]) {
+                        Log.network.error("\(label) stop_reason=\(raw)")
+                        assembler.fail(failure)
+                        failed = true
+                        return false
+                    }
                     stopReason = mappedStopReason(raw)
                 }
                 applyUsage(event["usage"] as? [String: Any], to: &usage)
@@ -427,6 +433,14 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
         }
         if let output = source["output_tokens"] as? Int { usage.output = output }
         usage.totalTokens = usage.input + usage.output
+    }
+
+    private func stopFailure(_ raw: String, details: [String: Any]?) -> String? {
+        switch raw {
+        case "refusal": (details?["explanation"] as? String) ?? "The model refused to complete the request."
+        case "sensitive": "The provider stopped this reply because its safety filters flagged the content."
+        default: nil
+        }
     }
 
     private func mappedStopReason(_ raw: String) -> StopReason {

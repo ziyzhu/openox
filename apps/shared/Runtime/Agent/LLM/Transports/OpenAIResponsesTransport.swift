@@ -530,7 +530,16 @@ public struct OpenAIResponsesTransport: ProviderClient {
                     terminalResponseOutput = try? JSONSerialization.data(withJSONObject: output, options: [.sortedKeys])
                 }
                 let status = (response["status"] as? String) ?? (type == "response.incomplete" ? "incomplete" : "completed")
-                assembler.setRawStopReason(status)
+                let incompleteReason = (response["incomplete_details"] as? [String: Any])?["reason"] as? String
+                assembler.setRawStopReason(incompleteReason.map { "\(status).\($0)" } ?? status)
+                if status == "incomplete", incompleteReason != "max_output_tokens" {
+                    Log.network.error("\(label) response.incomplete reason=\(incompleteReason ?? "none")")
+                    assembler.fail(incompleteReason == "content_filter"
+                        ? "The provider stopped this reply because its content filter flagged it."
+                        : "The response was incomplete: \(incompleteReason ?? "no reason given").")
+                    failed = true
+                    return false
+                }
                 stopReason = status == "incomplete" ? .length : (assembler.hasToolCalls ? .toolUse : .stop)
                 for item in response["output"] as? [[String: Any]] ?? [] where (item["type"] as? String) == "reasoning" {
                     assembler.setReasoningItem(item)
