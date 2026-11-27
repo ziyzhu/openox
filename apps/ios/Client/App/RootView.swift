@@ -6,7 +6,8 @@ import Security
 
 private enum ConversationTransition: Equatable {
     case idle
-    case opening
+    case sliding(UUID)
+    case opening(UUID)
 }
 
 private struct CurrentConversationActivityObserver: View {
@@ -677,9 +678,7 @@ struct RootView: View {
                     .opacity(conversationTransition == .idle ? 1 : 0)
             }
 
-            if conversations.current == nil
-                || conversations.openingId != nil
-                || conversationTransition != .idle {
+            if conversations.current == nil || isLoadingConversation {
                 Group {
                     if let progress = storage.migrationProgress {
                         ProfileMigrationProgressView(stage: progress,
@@ -764,6 +763,11 @@ struct RootView: View {
         setSidebar(false)
     }
 
+    private var isLoadingConversation: Bool {
+        guard case .opening(let id) = conversationTransition else { return false }
+        return conversations.currentId != id
+    }
+
     private func openConversationFromSidebar(_ id: UUID) {
         guard !isSplitLayout, showSidebar else {
             conversationTransition = .idle
@@ -777,15 +781,22 @@ struct RootView: View {
             setSidebar(false)
             return
         }
-        conversationTransition = .opening
         conversations.open(id)
-        if conversations.currentId == id {
+        guard conversations.currentId != id else {
             conversationTransition = .idle
             Log.ui.info("ConversationUX.lifecycle conversation=\(id) phase=shellOpening source=memory")
-        } else {
-            Log.ui.info("ConversationUX.lifecycle conversation=\(id) phase=shellOpening source=storage")
+            setSidebar(false)
+            return
         }
-        setSidebar(false)
+        conversationTransition = .sliding(id)
+        Log.ui.info("ConversationUX.lifecycle conversation=\(id) phase=shellOpening source=storage")
+        setSidebar(false) { finishConversationSlide(id) }
+    }
+
+    private func finishConversationSlide(_ id: UUID) {
+        guard conversationTransition == .sliding(id) else { return }
+        conversationTransition = .opening(id)
+        Log.ui.info("ConversationUX.lifecycle conversation=\(id) phase=shellSettled loading=\(isLoadingConversation)")
     }
 
     private func finishConversationOpening(_ visibleId: UUID) {
@@ -800,7 +811,8 @@ struct RootView: View {
     }
 
     private func isAwaitingPresentation(of visibleId: UUID) -> Bool {
-        conversationTransition == .opening && conversations.openingId == nil && conversations.currentId == visibleId
+        guard conversationTransition != .idle else { return false }
+        return conversations.openingId == nil && conversations.currentId == visibleId
     }
 
     private func openConversation(_ id: UUID) {
@@ -808,7 +820,7 @@ struct RootView: View {
             conversationHistoryRequestID = UUID()
             return
         }
-        conversationTransition = .opening
+        conversationTransition = .opening(id)
         conversations.open(id)
     }
 
@@ -919,7 +931,7 @@ struct RootView: View {
         reduceMotion ? Theme.Animation.quick : (isSplitLayout ? Self.sidebarSpring : Theme.Animation.page)
     }
 
-    private func setSidebar(_ open: Bool) {
+    private func setSidebar(_ open: Bool, onSettled: @escaping () -> Void = {}) {
         guard !open || conversations.current?.activity.isAwaitingUser != true else {
             Log.ui.info("RootView.sidebarOpen suppressed=awaitingUser conversation=\(conversations.currentId?.uuidString ?? "none")")
             return
@@ -928,7 +940,7 @@ struct RootView: View {
         if open {
             refreshCompactSidebar()
         }
-        withAnimation(sidebarAnimation, completionCriteria: .removed) {
+        withAnimation(sidebarAnimation, completionCriteria: .logicallyComplete) {
             if isSplitLayout {
                 showSplitSidebar = open
             } else {
@@ -936,6 +948,7 @@ struct RootView: View {
             }
         } completion: {
             if open, showSidebar { refreshConversationSummaries(reason: "sidebar") }
+            onSettled()
         }
     }
 
