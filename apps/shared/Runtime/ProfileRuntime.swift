@@ -8,6 +8,10 @@ nonisolated struct ConversationSummary: Sendable {
     let lastActivity: Date?
     let active: Bool
     let agent: RemoteAgentBinding?
+    let pinned: Bool
+    let scheduled: Bool
+    let status: String
+    let parentID: UUID?
 }
 
 @MainActor

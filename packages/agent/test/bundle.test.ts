@@ -75,6 +75,14 @@ it("shares the core across hosts and rejects ambiguous ownership in the shipped 
   expect(guide).not.toContain("does not forcibly stop");
   expect(guide).toContain("supports interrupting JavaScript loops");
   expect(guide).toContain("synchronous .help()");
+  realm.guide = { ...realm.guide, functions: ["ox.fs.read", "ox.web.fetch"] };
+  const scoped = runInContext("OxPrompts.executeGuidance(guide)", realm) as string;
+  expect(scoped).toContain("function read(args:");
+  expect(scoped).toContain("function fetch(args:");
+  expect(scoped).not.toContain("function write(args:");
+  expect(scoped).not.toContain("declare namespace ox.service");
+  expect(scoped).not.toContain("ox.web.browser.showPage");
+  expect(scoped).not.toContain("Standard action contracts");
 });
 
 for (const name of ["harness", "harness-storage"]) {

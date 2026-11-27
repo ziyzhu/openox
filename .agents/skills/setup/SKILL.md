@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Set up OpenOx for CLI, macOS app, or iOS development. Use for dependencies, simulator provisioning, signing, bundled services, first launch, contribution preparation, or setup troubleshooting.
+description: Set up OpenOx for CLI, macOS app, iOS, or Android development. Use for dependencies, simulator provisioning, signing, bundled services, first launch, contribution preparation, or setup troubleshooting.
 ---
 
 # Setup
@@ -67,6 +67,30 @@ No Apple Account is needed. Install the required [runtime in Xcode](https://deve
 3. Release your claim when done and shut down the simulator if you booted it for this task. Leave other simulators and their data alone.
 
 For seeded QA, use [device templates](references/device-templates.md). [ChatGPT login transfer](references/chatgpt-login.md) is a separate, opt-in workflow.
+
+## Build and run the Android Client
+
+The Android app is a Kotlin and Jetpack Compose Client for an Ox Host. An on-device Host is in progress: **Use This Device** on the first screen runs conversations through the packaged agent bundle, with a mock model or an API-key provider added under Settings. The model can run `execute` scripts that use `ox.fs`, `ox.web.fetch`, `ox.conversation.rename`, the agent Browser (`ox.web.browser`, WebView pages it can probe and show to the user) and web services (`ox.service`) from the built-in bundle or the Profile's writable `repositories/local/`. API, MCP and native services, iframes, secrets, attachments and schedules are not available yet. With the mock model, a message starting with `js ` runs the rest as a script. To exercise a provider against a local test server in a Debug build, add `--es ox.debug.providerEndpoints <provider-id>=<url>` to the launch command. Install JDK 21 and Google's `android` CLI (`curl -fsSL https://dl.google.com/android/cli/latest/darwin_arm64/install.sh | bash`, then `android init` and `android update`), then the SDK packages. Gradle reads the SDK only from `ANDROID_HOME`, including when the CLI drives it:
+
+```sh
+brew install openjdk@21
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home ANDROID_HOME=~/Library/Android/sdk
+android sdk install platform-tools emulator platforms/android-37.2 build-tools/37.0.0 system-images/android-37.0/google_apis/arm64-v8a cmdline-tools/latest
+$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd -n ox-android-1 -k "system-images;android-37.0;google_apis;arm64-v8a" -d pixel_10
+```
+
+The SDK license prompt belongs to the contributor; ask before accepting it. Check, start the emulator, then build, install and launch from `apps/android`:
+
+```sh
+bun run build:agent
+(cd apps/android && ./gradlew assembleDebug lint)
+android emulator start ox-android-1
+(cd apps/android && android run :app)
+```
+
+Drive the app with `android layout --flat` (controls carry their automation identifiers as `resource-id`), `android input tap 'id=<identifier>'`, `android input text '<text>' 'id=<identifier>'`, and `android screen capture -o <path>` outside the repository. A swipe that starts within about 60 px of the left edge is the system Back gesture.
+
+The application ID reuses `OX_BUNDLE_IDENTIFIER` from `apps/ios/Local.xcconfig`, or `iosBundleIdentifier` in `.github/ci.json`. To test against a simulator Host with Debug loopback on port `<port>`, run `adb reverse tcp:<port> tcp:<port>` and enter `ws://127.0.0.1:<port>` in the app. On a phone, use the Host's Tailscale address. To check the on-device agent in a Debug build, run `adb shell am start -n <application-id>/ai.openox.ox.android.MainActivity --es ox.debug.agentProbe hello` and look for `agent.probe.finished status=done` in `adb logcat -s Ox`. Kotlin warnings and Android lint findings fail the build. Stop the emulator with `android emulator stop ox-android-1` when done.
 
 ## Contributing
 

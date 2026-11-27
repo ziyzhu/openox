@@ -53,7 +53,7 @@ export function artifacts(): Record<string, string> {
     }])),
   };
   const requestNames = [...new Set(Object.values(Methods).map(entry => entry.params))];
-  requestNames.push("BootstrapFileInput");
+  requestNames.push("BootstrapFileInput", "AttachmentInput");
   const swift = `import Foundation\n\nextension ProfileProtocol {\n    static let contractVersion = ${RPC_VERSION}\n\n    enum Method: String, CaseIterable {\n${Object.entries(Methods).map(([name, entry]) => `        case ${entry.swiftCase} = "${name}"`).join("\n")}\n    }\n\n${requestNames.map(swiftStruct).join("\n\n")}\n}\n`;
   return {
     "packages/protocol/schema.json": JSON.stringify(schema, null, 2) + "\n",

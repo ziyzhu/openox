@@ -439,6 +439,25 @@
       },
       "additionalProperties": true
     },
+    "AttachmentInput": {
+      "type": "object",
+      "required": [
+        "name",
+        "data"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "data": {
+          "type": "string",
+          "contentEncoding": "base64"
+        }
+      },
+      "additionalProperties": true
+    },
     "SendConversationRequest": {
       "type": "object",
       "required": [
@@ -467,6 +486,150 @@
               "type": "null"
             }
           ]
+        },
+        "attachments": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/AttachmentInput"
+              },
+              "maxItems": 10
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "skill": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "ConversationIDRequest": {
+      "type": "object",
+      "required": [
+        "conversationId"
+      ],
+      "properties": {
+        "conversationId": {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36
+        }
+      },
+      "additionalProperties": true
+    },
+    "RenameConversationRequest": {
+      "type": "object",
+      "required": [
+        "conversationId",
+        "title"
+      ],
+      "properties": {
+        "conversationId": {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "additionalProperties": true
+    },
+    "PinConversationRequest": {
+      "type": "object",
+      "required": [
+        "conversationId",
+        "pinned"
+      ],
+      "properties": {
+        "conversationId": {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "pinned": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ConversationBlockRequest": {
+      "type": "object",
+      "required": [
+        "conversationId",
+        "blockId"
+      ],
+      "properties": {
+        "conversationId": {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "blockId": {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36
+        }
+      },
+      "additionalProperties": true
+    },
+    "EditConversationRequest": {
+      "type": "object",
+      "required": [
+        "conversationId",
+        "blockId",
+        "text"
+      ],
+      "properties": {
+        "conversationId": {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "blockId": {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "ConversationServicesRequest": {
+      "type": "object",
+      "required": [
+        "conversationId",
+        "domains"
+      ],
+      "properties": {
+        "conversationId": {
+          "type": "string",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "domains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": true
@@ -1074,6 +1237,18 @@
         },
         "agent": {
           "$ref": "#/definitions/ConversationAgent"
+        },
+        "pinned": {
+          "type": "boolean"
+        },
+        "scheduled": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string"
+        },
+        "parentId": {
+          "type": "string"
         }
       },
       "additionalProperties": true
@@ -1371,6 +1546,207 @@
         },
         "requiresApp": {
           "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "TurnEnding": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "stopped"
+            },
+            {
+              "type": "string",
+              "const": "failed"
+            }
+          ]
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "FollowIntent": {
+      "type": "object",
+      "required": [
+        "label",
+        "message"
+      ],
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "QueuedConversationMessage": {
+      "type": "object",
+      "required": [
+        "id",
+        "text",
+        "attachments"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "ConversationView": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "providerId",
+        "model",
+        "temporary",
+        "blocks",
+        "isBusy",
+        "status",
+        "followIntents",
+        "queued",
+        "services"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "providerId": {
+          "type": "string"
+        },
+        "model": {
+          "$ref": "#/definitions/ProviderModel"
+        },
+        "temporary": {
+          "type": "boolean"
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Block"
+          }
+        },
+        "isBusy": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string"
+        },
+        "pendingPrompt": {
+          "$ref": "#/definitions/PendingConversationPrompt"
+        },
+        "turnEnding": {
+          "$ref": "#/definitions/TurnEnding"
+        },
+        "followIntents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FollowIntent"
+          }
+        },
+        "queued": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/QueuedConversationMessage"
+          }
+        },
+        "services": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "parentId": {
+          "type": "string"
+        },
+        "parentTitle": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ConversationViewResult": {
+      "type": "object",
+      "required": [
+        "data"
+      ],
+      "properties": {
+        "data": {
+          "$ref": "#/definitions/ConversationView"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ConversationIDResult": {
+      "type": "object",
+      "required": [
+        "conversationId"
+      ],
+      "properties": {
+        "conversationId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "SkillRow": {
+      "type": "object",
+      "required": [
+        "name",
+        "description",
+        "services"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "services": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "ListSkillsResult": {
+      "type": "object",
+      "required": [
+        "skills"
+      ],
+      "properties": {
+        "skills": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SkillRow"
+          }
         }
       },
       "additionalProperties": true
@@ -1754,6 +2130,22 @@
       },
       "additionalProperties": true
     },
+    "DefaultModel": {
+      "type": "object",
+      "required": [
+        "providerId",
+        "modelId"
+      ],
+      "properties": {
+        "providerId": {
+          "type": "string"
+        },
+        "modelId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
     "ListProvidersResult": {
       "type": "object",
       "required": [
@@ -1769,6 +2161,9 @@
           "items": {
             "$ref": "#/definitions/ProviderRow"
           }
+        },
+        "defaultModel": {
+          "$ref": "#/definitions/DefaultModel"
         }
       },
       "additionalProperties": true

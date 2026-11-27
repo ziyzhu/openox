@@ -155,6 +155,9 @@ extension ProfileProtocol {
         runtime: any ProfileRuntime,
         reply: ProfileRPC.Reply
     ) {
+        if command.attachments?.isEmpty == false || command.skill != nil {
+            return handleRichSend(command, runtime: runtime, reply: reply)
+        }
         guard !command.text.isEmpty else { return reply.failure("missing text") }
         Task { @MainActor in
             do {
@@ -299,7 +302,8 @@ extension ProfileProtocol {
             )
         }
         Log.agent.debug("ProfileRPC.providers.list id=\(reply.id) count=\(providers.count)")
-        reply.success(ListProvidersResult(region: AppRegion.shared.region.rawValue, providers: providers))
+        let selected = registry.defaultModel.map { DefaultModel(providerId: $0.providerID, modelId: $0.modelID) }
+        reply.success(ListProvidersResult(region: AppRegion.shared.region.rawValue, providers: providers, defaultModel: selected))
     }
 
     @MainActor

@@ -30,6 +30,17 @@ extension ProfileProtocol {
         case newConversation = "conversations.new"
         case sendConversation = "conversations.send"
         case stopConversation = "conversations.stop"
+        case viewConversation = "conversations.view"
+        case renameConversation = "conversations.rename"
+        case pinConversation = "conversations.pin"
+        case deleteConversation = "conversations.delete"
+        case branchConversation = "conversations.branch"
+        case retryConversation = "conversations.retry"
+        case retryFailedConversation = "conversations.retryFailed"
+        case editConversation = "conversations.edit"
+        case cancelQueuedConversation = "conversations.cancelQueued"
+        case setConversationServices = "conversations.setServices"
+        case listSkills = "skills.list"
         case listProviders = "providers.list"
         case listAgents = "agents.list"
         case addAgent = "agents.add"
@@ -128,6 +139,38 @@ extension ProfileProtocol {
         let conversationId: String?
         let text: String
         let wait: Bool?
+        let attachments: [AttachmentInput]?
+        let skill: String?
+    }
+
+    struct ConversationIDRequest: Decodable {
+        let conversationId: String
+    }
+
+    struct RenameConversationRequest: Decodable {
+        let conversationId: String
+        let title: String
+    }
+
+    struct PinConversationRequest: Decodable {
+        let conversationId: String
+        let pinned: Bool
+    }
+
+    struct ConversationBlockRequest: Decodable {
+        let conversationId: String
+        let blockId: String
+    }
+
+    struct EditConversationRequest: Decodable {
+        let conversationId: String
+        let blockId: String
+        let text: String
+    }
+
+    struct ConversationServicesRequest: Decodable {
+        let conversationId: String
+        let domains: [String]
     }
 
     struct AddAgentRequest: Decodable {
@@ -205,6 +248,11 @@ extension ProfileProtocol {
     }
 
     struct BootstrapFileInput: Decodable {
+        let name: String
+        let data: Data
+    }
+
+    struct AttachmentInput: Decodable {
         let name: String
         let data: Data
     }

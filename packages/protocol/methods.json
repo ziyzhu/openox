@@ -209,6 +209,94 @@
         "$ref": "./schema.json#/definitions/StopConversationResult"
       }
     },
+    "conversations.view": {
+      "params": {
+        "$ref": "./schema.json#/definitions/ConversationIDRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ConversationViewResult"
+      }
+    },
+    "conversations.rename": {
+      "params": {
+        "$ref": "./schema.json#/definitions/RenameConversationRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
+    "conversations.pin": {
+      "params": {
+        "$ref": "./schema.json#/definitions/PinConversationRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
+    "conversations.delete": {
+      "params": {
+        "$ref": "./schema.json#/definitions/ConversationIDRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
+    "conversations.branch": {
+      "params": {
+        "$ref": "./schema.json#/definitions/ConversationBlockRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ConversationIDResult"
+      }
+    },
+    "conversations.retry": {
+      "params": {
+        "$ref": "./schema.json#/definitions/ConversationBlockRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ConversationIDResult"
+      }
+    },
+    "conversations.retryFailed": {
+      "params": {
+        "$ref": "./schema.json#/definitions/ConversationIDRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ConversationIDResult"
+      }
+    },
+    "conversations.edit": {
+      "params": {
+        "$ref": "./schema.json#/definitions/EditConversationRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ConversationIDResult"
+      }
+    },
+    "conversations.cancelQueued": {
+      "params": {
+        "$ref": "./schema.json#/definitions/ConversationBlockRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
+    "conversations.setServices": {
+      "params": {
+        "$ref": "./schema.json#/definitions/ConversationServicesRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/EmptyResult"
+      }
+    },
+    "skills.list": {
+      "params": {
+        "$ref": "./schema.json#/definitions/EmptyRequest"
+      },
+      "result": {
+        "$ref": "./schema.json#/definitions/ListSkillsResult"
+      }
+    },
     "providers.list": {
       "params": {
         "$ref": "./schema.json#/definitions/EmptyRequest"

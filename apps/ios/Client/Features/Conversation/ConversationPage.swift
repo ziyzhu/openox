@@ -547,7 +547,7 @@ struct ConversationPage: View {
                     primaryButton: .cancel(),
                     secondaryButton: .destructive(Text("Regenerate")) {
                         Log.ui.info("ConversationPage.retry conversation=\(conversation.id) atBlock=\(id)")
-                        Task { latestSubmissionID = await conversation.retry(at: id)?.id }
+                        Task { latestSubmissionID = await conversation.rerun(at: id, replacingText: nil)?.receipt.id }
                     }
                 )
             }
@@ -1722,7 +1722,7 @@ struct ConversationPage: View {
             editedBlockID = nil
             editDraft = AttributedString()
         } completion: {
-            Task { latestSubmissionID = await conversation.editAndRerun(at: blockID, newText: trimmed)?.id }
+            Task { latestSubmissionID = await conversation.rerun(at: blockID, replacingText: trimmed)?.receipt.id }
         }
     }
 

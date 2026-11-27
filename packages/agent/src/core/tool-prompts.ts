@@ -33,14 +33,14 @@ const commonContracts = {
   "ox.service.invoke": serviceContracts["ox.service.invoke"],
 };
 
-const commonDeclarations = ["fs", "web", "web.browser", "service"].map(namespace => {
-  const functions = Object.entries(commonContracts).filter(([name]) => name.slice(0, name.lastIndexOf(".")) === `ox.${namespace}`)
+const commonDeclarations = (available?: string[]) => ["fs", "web", "web.browser", "service"].flatMap(namespace => {
+  const functions = Object.entries(commonContracts).filter(([name]) => name.slice(0, name.lastIndexOf(".")) === `ox.${namespace}` && (!available || available.includes(name)))
     .map(([name, contract]) => {
       const description = contract.description.replace(/: `await [^`]+`/g, "").replace(/`await (ox\.[\w.]+)\([^`]*\)`/g, "`$1`").replace(/`(ox\.[\w.]+)\([^`]*\)`/g, "`$1`").replaceAll("*/", "*\\/");
       const signature = renderToolSignature({ ...contract, name: name.split(".").at(-1)! });
       return `  /** ${description} */\n  function ${signature}`;
     }).join("\n");
-  return `declare namespace ox.${namespace} {\n${functions}\n}`;
+  return functions ? [`declare namespace ox.${namespace} {\n${functions}\n}`] : [];
 }).join("\n\n");
 
 const standardActionDeclarations = Object.entries(standardServiceActions).map(([kind, actions]) =>
@@ -51,20 +51,22 @@ export const countWords = ["zero", "one", "two", "three", "four", "five", "six",
 const countWord = (value: number) => countWords[value] ?? String(value);
 export interface ExecuteGuidanceInput {
   catalog: string; timeoutSeconds: number; maxOutputTokens: number;
-  maxFetches?: number; maxTransientAttachments?: number; canCancelLoops?: boolean;
+  maxFetches?: number; maxTransientAttachments?: number; canCancelLoops?: boolean; functions?: string[];
 }
 
 export function executeGuidance(input: ExecuteGuidanceInput) {
   if (typeof input?.catalog !== "string" || ![input.timeoutSeconds, input.maxOutputTokens].every(value => Number.isSafeInteger(value) && value > 0)
     || ![input.maxFetches ?? 8, input.maxTransientAttachments ?? 4].every(value => Number.isSafeInteger(value) && value >= 0)) throw new Error("Invalid execution guidance facts");
+  if (input.functions !== undefined && !(Array.isArray(input.functions) && input.functions.every(name => typeof name === "string"))) throw new Error("Invalid execution guidance functions");
+  const has = (name: string) => !input.functions || input.functions.includes(name);
   return [
     "Run JavaScript as an async function body. Top-level await and return work. Emit text with console.log or return. Use await image(block) to send a Base64 image block from ox.fs.read or an image data URL to the model, not the conversation UI; it does not save a file or fetch remote URLs. Images share the transient attachment limits. Do not print Base64. Use only exposed capabilities; no shell, Node, or direct filesystem access.",
     input.catalog,
-    "The catalog contains summaries, not full contracts. Use the declarations below immediately; executions are JavaScript, not TypeScript. Find functions by task with await searchTools(query, { limit?, namespace? }); it returns up to eight ranked { name, description } summaries by default and does not invoke or attach anything. Before calling an unfamiliar match, print its full contract with its synchronous .help() (for example, ox.fs.grep.help()). Batch needed contracts with independent work in the same execution. Reuse contracts already supplied here or by ox.service.inspect. Operational calls require a short purpose; help and ox.provider.schema() do not. Use ox.fs for files.",
-    "Common built-in functions:\n```ts\n" + commonDeclarations + "\n```",
-    "Call standard service actions through ox.service.invoke, not as ox methods. Their full contracts follow; no further schema discovery is needed. Establish optional website action availability from inspect standardActions or existing evidence. Other service types always expose their two standard actions, including before MCP discovery succeeds. Inspect returns paginated non-standard contracts. Invocation automatically attaches its service when needed, including standard setup actions, under normal attachment policy. Inspection does not attach services. Attachment does not grant permissions or authentication. Do not assume optional support, preflight every action, or replay writes after setup.",
-    "Standard action contracts:\n```ts\n" + standardActionDeclarations + "\n```",
-    "Read skills/authentication/SKILL.md for website authentication and account creation, and skills/checkout/SKILL.md for transaction review and payment. Other human-verification handoffs follow Evolve's web-handoffs reference. For an observed human-verification challenge, present the exact live page with ox.web.browser.showPage even if it appears blank or usable controls cannot be verified; explain the blocker and disclose the display uncertainty. Also present the exact page when the user asks to see it. After showPage returns completed, immediately discover fresh frames on the same pageId and inspect the current document before replying or ending the turn; replace the pre-handoff blocker assessment with fresh evidence and continue the original task when unblocked. Do not require another user message to resume. Never bypass human-verification challenges or request their answers or tokens.",
+    `The catalog contains summaries, not full contracts. Use the declarations below immediately; executions are JavaScript, not TypeScript.${has("searchTools") ? " Find functions by task with await searchTools(query, { limit?, namespace? }); it returns up to eight ranked { name, description } summaries by default and does not invoke or attach anything. Before calling an unfamiliar match, print its full contract with its synchronous .help() (for example, ox.fs.grep.help()). Batch needed contracts with independent work in the same execution." : " Before using other unfamiliar functions, print their synchronous .help(), batching needed contracts with independent work in the same execution."} Reuse contracts already supplied here or by ox.service.inspect. Operational calls require a short purpose; help and ox.provider.schema() do not. Use ox.fs for files.`,
+    "Common built-in functions:\n```ts\n" + commonDeclarations(input.functions) + "\n```",
+    ...(has("ox.service.invoke") ? ["Call standard service actions through ox.service.invoke, not as ox methods. Their full contracts follow; no further schema discovery is needed. Establish optional website action availability from inspect standardActions or existing evidence. Other service types always expose their two standard actions, including before MCP discovery succeeds. Inspect returns paginated non-standard contracts. Invocation automatically attaches its service when needed, including standard setup actions, under normal attachment policy. Inspection does not attach services. Attachment does not grant permissions or authentication. Do not assume optional support, preflight every action, or replay writes after setup.",
+    "Standard action contracts:\n```ts\n" + standardActionDeclarations + "\n```"] : []),
+    ...(has("ox.web.browser.showPage") ? ["Read skills/authentication/SKILL.md for website authentication and account creation, and skills/checkout/SKILL.md for transaction review and payment. Other human-verification handoffs follow Evolve's web-handoffs reference. For an observed human-verification challenge, present the exact live page with ox.web.browser.showPage even if it appears blank or usable controls cannot be verified; explain the blocker and disclose the display uncertainty. Also present the exact page when the user asks to see it. After showPage returns completed, immediately discover fresh frames on the same pageId and inspect the current document before replying or ending the turn; replace the pre-handoff blocker assessment with fresh evidence and continue the original task when unblocked. Do not require another user message to resume. Never bypass human-verification challenges or request their answers or tokens."] : []),
     `Batch independent reads with Promise.allSettled and chain predictable dependent steps, stopping on failure. Filter large results before printing; return to the model only when evidence requires a decision. Serialize writes and approval-dependent calls. Await needed calls; pending calls are cancelled at script exit. Effects are not rolled back on failure. Preserve error code, message, and recovery with console.error(error) or return; verify uncertain effects before retrying writes.`,
     `Each execution is self-contained; never store continuation state on globalThis. Return concise progress or persist it through an authorized file. Use bounded loops. The active execution limit is ${input.timeoutSeconds} seconds. ${input.canCancelLoops ? "The runtime supports interrupting JavaScript loops." : "Cancellation does not forcibly stop an infinite JavaScript loop."}`,
     `Service actions and user handoffs do not consume active execution time. Each execution may fetch at most ${countWord(input.maxFetches ?? 8)} public resources and add at most ${countWord(input.maxTransientAttachments ?? 4)} transient attachments; presented files do not count toward that attachment limit.`,

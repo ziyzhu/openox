@@ -229,9 +229,13 @@ final class Conversation: Identifiable {
 
     func setTranscriptVisible(_ visible: Bool) {
         isTranscriptVisible = visible
-        guard visible, hasUnreadResponse else { return }
+        if visible { markResponseRead(source: "transcript") }
+    }
+
+    func markResponseRead(source: String) {
+        guard hasUnreadResponse else { return }
         hasUnreadResponse = false
-        Log.session.info("Conversation.read id=\(id)")
+        Log.session.info("Conversation.read id=\(id) source=\(source)")
         onPersistableChange?()
     }
 
@@ -1232,17 +1236,7 @@ final class Conversation: Identifiable {
         try await interactions.requireApproval(action: action, defaultPolicy: defaultPolicy, args: args, purpose: purpose, prompt: prompt)
     }
 
-    @discardableResult
-    func retry(at blockId: UUID) async -> SubmissionReceipt? {
-        await rerun(at: blockId, replacingText: nil)
-    }
-
-    @discardableResult
-    func editAndRerun(at blockId: UUID, newText: String) async -> SubmissionReceipt? {
-        await rerun(at: blockId, replacingText: newText)
-    }
-
-    private func rerun(at blockId: UUID, replacingText: String?) async -> SubmissionReceipt? {
+    func rerun(at blockId: UUID, replacingText: String?) async -> (receipt: SubmissionReceipt, replacement: Conversation)? {
         guard (try? await loadCompleteHistory()) != nil,
               let target = document.turnIndex(containingBlock: blockId),
               let cut = document.lastUserTurn(through: target) else {
@@ -1259,11 +1253,12 @@ final class Conversation: Identifiable {
             skillInvocation: cut.turn.skillInvocation
         )
         guard let replacement = conversationManager?.replaceForRerun(from: self, snapshot: snapshot) else { return nil }
-        return replacement.enqueue(
+        let receipt = replacement.enqueue(
             text,
             attachments: cut.turn.attachments,
             skillInvocation: replacingText == nil ? cut.turn.skillInvocation : nil
         )
+        return (receipt, replacement)
     }
 
     func branchSnapshot(at blockId: UUID) -> ConversationContinuation? {

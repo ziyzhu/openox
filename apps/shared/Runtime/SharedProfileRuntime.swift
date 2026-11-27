@@ -105,6 +105,7 @@ final class SharedProfileRuntime {
 
     func listConversations() async -> [ConversationSummary] {
         await conversations.loadAllSummaries()
+        let activities = conversations.activities
         return conversations.orderedSummaries.map { summary in
             ConversationSummary(
                 id: summary.id,
@@ -113,7 +114,11 @@ final class SharedProfileRuntime {
                 createdAt: summary.createdAt,
                 lastActivity: summary.lastActivity,
                 active: summary.id == conversations.currentId,
-                agent: summary.remoteAgent
+                agent: summary.remoteAgent,
+                pinned: summary.isFavorite,
+                scheduled: summary.scheduleID != nil,
+                status: activities[summary.id].map(ProfileProtocol.statusName) ?? (summary.hasUnreadResponse ? "unread" : "read"),
+                parentID: summary.parentID
             )
         }
     }

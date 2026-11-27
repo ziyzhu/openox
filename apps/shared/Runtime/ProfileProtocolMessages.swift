@@ -30,7 +30,11 @@ extension ProfileProtocol {
                 agent: summary.agent.map { binding in
                     ConversationAgent(name: RemoteAgentDirectory.shared.displayName(for: binding.endpoint), endpoint: binding.endpoint.absoluteString,
                                       conversationId: binding.conversationID, model: binding.model.map { "\($0.provider)/\($0.id)" })
-                }
+                },
+                pinned: summary.pinned,
+                scheduled: summary.scheduled,
+                status: summary.status,
+                parentId: summary.parentID?.uuidString
             )
         }
     }
@@ -43,6 +47,10 @@ extension ProfileProtocol {
         let lastActivity: JSONValue
         let active: Bool
         let agent: ConversationAgent?
+        let pinned: Bool
+        let scheduled: Bool
+        let status: String
+        let parentId: String?
     }
 
     struct ConversationAgent: Encodable {
@@ -88,6 +96,12 @@ extension ProfileProtocol {
     struct ListProvidersResult: Encodable {
         let region: String
         let providers: [ProviderRow]
+        let defaultModel: DefaultModel?
+    }
+
+    struct DefaultModel: Encodable {
+        let providerId: String
+        let modelId: String
     }
 
     struct DebugLogRow: Encodable {
