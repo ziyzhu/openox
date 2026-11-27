@@ -114,6 +114,7 @@ final class ConversationManager {
     @ObservationIgnored private let debugRepositorySaveGate: ProfileRepositorySaveGate
     private static let saveDebounceNs: UInt64 = 1_000_000_000
     private static let maxHydratedConversations = 5
+    private static let recentPreloadCount = 3
     private static let firstSummaryPageSize = 20
     private static let summaryPageSize = 50
 
@@ -567,6 +568,20 @@ final class ConversationManager {
             if let conversation { self.setCurrent(conversation) }
             else { self.selection = self.current.map(Selection.active) ?? .empty }
         }
+    }
+
+    func preload(_ rawID: UUID, reason: String) {
+        let id = canonicalID(rawID)
+        guard contains(rawID), let record = records[id], case .unloaded = record.hydration else { return }
+        Log.session.info("ConversationManager.preload id=\(id) reason=\(reason)")
+        Task(priority: .userInitiated) { [weak self] in
+            guard let self, await self.hydrate(id) != nil else { return }
+            self.trimHydrated()
+        }
+    }
+
+    func preloadRecent() {
+        for meta in orderedSummaries.prefix(Self.recentPreloadCount) { preload(meta.id, reason: "recent") }
     }
 
     func openForClient(_ rawID: UUID) async throws -> Conversation {

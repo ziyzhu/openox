@@ -17,6 +17,7 @@ struct ConversationSidebar: View {
     let onSearch: () async -> Void
     let onNewConversation: () -> Void
     let onOpen: (ConversationMeta) -> Void
+    let onPress: (ConversationMeta) -> Void
     let onDelete: (ConversationMeta) -> Void
     let onRename: (ConversationMeta, String) -> Void
     let onToggleFavorite: (ConversationMeta) -> Void
@@ -197,7 +198,8 @@ struct ConversationSidebar: View {
             meta: meta,
             activity: activities[meta.id] ?? .idle(.read),
             isActive: meta.id == currentId,
-            edgeInset: edgeInset
+            edgeInset: edgeInset,
+            onPress: { onPress(meta) }
         ) {
             searchPresented = false
             onOpen(meta)
@@ -242,6 +244,7 @@ private struct SidebarRow: View {
     let activity: Conversation.Activity
     let isActive: Bool
     let edgeInset: CGFloat
+    let onPress: () -> Void
     let onTap: () -> Void
 
     var body: some View {
@@ -273,7 +276,7 @@ private struct SidebarRow: View {
                 }
             }
         }
-        .buttonStyle(SidebarRowButtonStyle(isActive: isActive, edgeInset: edgeInset))
+        .buttonStyle(SidebarRowButtonStyle(isActive: isActive, edgeInset: edgeInset, onPress: onPress))
         .accessibilityLabel(meta.displayTitle)
         .accessibilityValue(accessibilityValue)
         .accessibilityIdentifier(A11yID.Sidebar.row(meta.id.uuidString))
@@ -379,6 +382,7 @@ private extension Conversation.Activity.AwaitingAction {
 private struct SidebarRowButtonStyle: ButtonStyle {
     let isActive: Bool
     let edgeInset: CGFloat
+    let onPress: () -> Void
 
     func makeBody(configuration: Configuration) -> some View {
         let tinted = isActive || configuration.isPressed
@@ -392,5 +396,8 @@ private struct SidebarRowButtonStyle: ButtonStyle {
             .padding(.horizontal, edgeInset - Theme.Spacing.sm)
             .padding(.vertical, 2)
             .contentShape(Rectangle())
+            .onChange(of: configuration.isPressed) { _, pressed in
+                if pressed { onPress() }
+            }
     }
 }

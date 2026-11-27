@@ -522,6 +522,7 @@ struct RootView: View {
             gestureEnabled: !childNavigationActive,
             onOpeningDrag: {
                 refreshCompactSidebar()
+                preloadRecentConversations()
                 dismissKeyboard(via: "sidebarDrag")
             },
             onOpened: { refreshConversationSummaries(reason: "sidebarDrag") },
@@ -598,6 +599,10 @@ struct RootView: View {
                     openConversationFromSidebar(meta.id)
                 }
             },
+            onPress: { meta in
+                guard startup == .ready else { return }
+                conversations.preload(meta.id, reason: "press")
+            },
             onDelete: { meta in
                 sidebarAction("deleteConversation") {
                     conversations.delete(meta.id)
@@ -642,12 +647,21 @@ struct RootView: View {
     @ViewBuilder
     private var readyConversationLayer: some View {
         ZStack {
-            if let conversation = conversations.current,
+            if let meta = openingShellMeta {
+                ConversationOpeningShell(
+                    meta: meta,
+                    parentTitle: meta.parentID.flatMap { conversations.summary($0)?.displayTitle },
+                    showsLoader: isLoadingConversation,
+                    onShowSidebar: { setSidebar(isSplitLayout ? !showSidebar : true) }
+                )
+                .id(meta.id)
+            } else if let conversation = conversations.current,
                conversations.openingId == nil {
                 ConversationPage(conversation: conversation,
                          historyOpenRequestID: conversationHistoryRequestID,
                          isCurrentConversation: { conversations.current === conversation },
                          allowsReviewRequest: startup == .ready && presentation == nil && (isSplitLayout || !showSidebar),
+                         hidesTranscript: conversationTransition != .idle,
                          composerFocusRequestID: composerFocusRequest?.conversationIdentity == ObjectIdentifier(conversation)
                              ? composerFocusRequest?.id
                              : nil,
@@ -676,10 +690,9 @@ struct RootView: View {
                     }
                     .onDisappear { conversation.setTranscriptVisible(false) }
                     .id(ObjectIdentifier(conversation))
-                    .opacity(conversationTransition == .idle ? 1 : 0)
             }
 
-            if conversations.current == nil || isLoadingConversation {
+            if conversations.current == nil, openingShellMeta == nil {
                 Group {
                     if let progress = storage.migrationProgress {
                         ProfileMigrationProgressView(stage: progress,
@@ -767,6 +780,14 @@ struct RootView: View {
     private var isLoadingConversation: Bool {
         guard case .opening(let id) = conversationTransition else { return false }
         return conversations.currentId != id
+    }
+
+    private var openingShellMeta: ConversationMeta? {
+        switch conversationTransition {
+        case .idle: nil
+        case .sliding(let id): conversations.summary(id)
+        case .opening(let id): conversations.currentId == id ? nil : conversations.summary(id)
+        }
     }
 
     private func openConversationFromSidebar(_ id: UUID) {
@@ -940,6 +961,7 @@ struct RootView: View {
         if open { dismissKeyboard(via: "sidebarOpen") }
         if open {
             refreshCompactSidebar()
+            preloadRecentConversations()
         }
         withAnimation(sidebarAnimation, completionCriteria: .logicallyComplete) {
             if isSplitLayout {
@@ -1047,6 +1069,11 @@ struct RootView: View {
     private func refreshCompactSidebar() {
         compactSidebarSummaries = conversations.summaries
         compactSidebarCurrentId = conversations.currentId
+    }
+
+    private func preloadRecentConversations() {
+        guard startup == .ready else { return }
+        conversations.preloadRecent()
     }
 
     private func refreshConversationSummaries(reason: String) {

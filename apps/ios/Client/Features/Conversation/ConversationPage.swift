@@ -17,6 +17,7 @@ struct ConversationPage: View {
     let historyOpenRequestID: UUID
     let isCurrentConversation: () -> Bool
     let allowsReviewRequest: Bool
+    let hidesTranscript: Bool
     let composerFocusRequestID: UUID?
     let onComposerFocusRequestHandled: (UUID) -> Void
     let onShowSidebar: () -> Void
@@ -283,6 +284,7 @@ struct ConversationPage: View {
             sourceBlockIDs: requestedSourceIDs,
             dockClearance: dockClearance
         )
+            .opacity(hidesTranscript ? 0 : 1)
             .toast($toast, accessibilityIdentifier: A11yID.ConversationControls.toast)
             .onChange(of: endedHandoffCount) { old, new in
                 guard new > old else { return }

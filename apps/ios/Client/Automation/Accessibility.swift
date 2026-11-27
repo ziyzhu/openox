@@ -158,6 +158,7 @@ nonisolated enum A11yID {
 
     enum ConversationControls {
         static let toast = "conversation.toast"
+        static let openingLoader = "conversation.openingLoader"
         static let more = "conversation.more"
         static let attach = "conversation.attach"
         static let input = "conversation.input"
