@@ -27,6 +27,7 @@ targets:
       - path: Diagnostics
       - path: ../shared/Runtime
       - path: ../shared/Platform/Models
+      - path: ../shared/Platform/Markdown
       - path: ../shared/Diagnostics
       - path: ../shared/Resources/OxServices.bundle
         type: file

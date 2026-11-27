@@ -82,6 +82,15 @@
 			path = Runtime;
 			sourceTree = "<group>";
 		};
+		191501A78D53A08AB122515E /* ../shared/Platform/Markdown */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = ../shared/Platform/Markdown;
+			sourceTree = "<group>";
+		};
 		39DBEEFD2349B6AAC23AFDB3 /* Diagnostics */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			explicitFileTypes = {
@@ -214,6 +223,7 @@
 			children = (
 				69FA8C14E36963500A64EE00 /* ../shared/Diagnostics */,
 				80752B2680E160944FA95240 /* ../shared/Platform */,
+				191501A78D53A08AB122515E /* ../shared/Platform/Markdown */,
 				7F2019FEEFDE02A1A735907C /* ../shared/Runtime */,
 				79A805EB43F2D699556D1EB1 /* Client */,
 				0D4980CAB76E94AE0EFE6803 /* Development */,
@@ -275,6 +285,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				191501A78D53A08AB122515E /* ../shared/Platform/Markdown */,
 				6EA3D60EE97836A7CA968F61 /* NotificationService */,
 			);
 			name = NotificationService;

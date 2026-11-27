@@ -1534,9 +1534,10 @@ final class Conversation: Identifiable {
     }
 
     private func stageCompletionNotification(assistant: AssistantMessage) {
-        let preview = assistant.content.compactMap {
+        let text = assistant.content.compactMap {
             if case .text(let t) = $0 { return t.text }; return nil
-        }.joined().trimmingCharacters(in: .whitespacesAndNewlines)
+        }.joined()
+        let preview = MarkdownBlock.plainText(text).trimmingCharacters(in: .whitespacesAndNewlines)
         let body = preview.isEmpty ? L10n.string("Your conversation finished while you were away.", comment: "Notification body shown when a conversation turn completes while the app is backgrounded and there is no preview text.") : String(preview.prefix(140))
         activeRun?.completionNotification = CompletionNotification(title: title, body: body)
     }

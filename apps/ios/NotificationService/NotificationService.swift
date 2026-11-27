@@ -25,7 +25,7 @@ nonisolated final class NotificationService: UNNotificationServiceExtension {
             return
         }
         content.title = message.title
-        content.body = message.body
+        content.body = MarkdownBlock.plainText(message.body)
         content.userInfo["remoteConversation"] = message.conversation
         content.userInfo["kind"] = message.kind
         Self.log.info("push.open kind=\(message.kind, privacy: .public)")
