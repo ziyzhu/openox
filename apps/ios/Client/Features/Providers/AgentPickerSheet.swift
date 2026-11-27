@@ -3,37 +3,64 @@ import SwiftUI
 struct AgentPickerSheet: View {
     let conversation: Conversation
     @Environment(\.dismiss) private var dismiss
+    @State private var refreshing = false
     private var registry: ProviderRegistry { .shared }
     private var agents: RemoteAgentDirectory { .shared }
     private var isChoosingInitialDefault: Bool { registry.defaultModel == nil }
 
     var body: some View {
         NavigationStack {
-            if let binding = conversation.remoteAgent {
-                RemoteAgentModelPicker(conversation: conversation, endpoint: binding.endpoint, onClose: { dismiss() }) {
-                    AgentSelectionGroup(conversation: conversation)
-                }
-            } else {
-                ModelPickerContent(
-                    title: isChoosingInitialDefault ? "Choose default model" : "Model for this conversation",
-                    activeSelection: conversation.modelSelectionChange?.pendingSelection ?? conversation.modelSelection,
-                    scopeDescription: isChoosingInitialDefault
-                        ? "Your choice will be used for this conversation and future conversations."
-                        : conversation.isBusy
-                            ? "Changes apply after the current response and stay with this conversation."
-                            : "Changes apply immediately and stay with this conversation.",
-                    header: conversation.canChangeAgent || !agents.agents.isEmpty ? AnyView(AgentSelectionGroup(conversation: conversation)) : nil,
-                    onClose: { dismiss() }
-                ) { client, model, selection in
-                    if registry.defaultModel == nil {
-                        registry.select(model, in: client.id, region: selection.region)
+            Group {
+                if let binding = conversation.remoteAgent {
+                    RemoteAgentModelPicker(conversation: conversation, endpoint: binding.endpoint, onClose: { dismiss() }) {
+                        AgentSelectionGroup(conversation: conversation)
                     }
-                    let status = conversation.requestModelSelection(.init(client: client, model: model))
-                    Log.ui.info("AgentPicker.select conversation=\(conversation.id) client=\(client.id) model=\(model.id) region=\(selection.region.rawValue) status=\(status)")
+                } else {
+                    ModelPickerContent(
+                        title: isChoosingInitialDefault ? "Choose default model" : "Model for this conversation",
+                        activeSelection: conversation.modelSelectionChange?.pendingSelection ?? conversation.modelSelection,
+                        scopeDescription: isChoosingInitialDefault
+                            ? "Your choice will be used for this conversation and future conversations."
+                            : conversation.isBusy
+                                ? "Changes apply after the current response and stay with this conversation."
+                                : "Changes apply immediately and stay with this conversation.",
+                        header: conversation.canChangeAgent || !agents.agents.isEmpty ? AnyView(AgentSelectionGroup(conversation: conversation)) : nil,
+                        onClose: { dismiss() }
+                    ) { client, model, selection in
+                        if registry.defaultModel == nil {
+                            registry.select(model, in: client.id, region: selection.region)
+                        }
+                        let status = conversation.requestModelSelection(.init(client: client, model: model))
+                        Log.ui.info("AgentPicker.select conversation=\(conversation.id) client=\(client.id) model=\(model.id) region=\(selection.region.rawValue) status=\(status)")
+                    }
+                }
+            }
+            .toolbar {
+                if !agents.agents.isEmpty {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { Task { await refresh(reason: "button") } } label: {
+                            if refreshing {
+                                CellularAutomatonLoader.small
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                        }
+                        .disabled(refreshing)
+                        .accessibilityLabel(refreshing ? "Refreshing agents…" : "Refresh agents")
+                        .accessibilityIdentifier(A11yID.ConversationControls.agentRefresh)
+                    }
                 }
             }
         }
-        .task { await agents.refreshAll() }
+        .task { await refresh(reason: "appear") }
+    }
+
+    private func refresh(reason: String) async {
+        guard !refreshing else { return }
+        refreshing = true
+        Log.ui.info("AgentPicker.refresh conversation=\(conversation.id) reason=\(reason) agents=\(agents.agents.count)")
+        await agents.refreshAll()
+        refreshing = false
     }
 }
 
