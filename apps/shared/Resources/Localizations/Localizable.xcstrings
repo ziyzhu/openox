@@ -159,16 +159,6 @@
         }
       }
     },
-    "Built in" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "内置"
-          }
-        }
-      }
-    },
     "Cancel voice input" : {
       "localizations" : {
         "zh-Hans" : {
@@ -216,26 +206,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法更改智能体"
-          }
-        }
-      }
-    },
-    "Current Device" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "当前设备"
-          }
-        }
-      }
-    },
-    "Current Device · %@" : {
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "当前设备 · %@"
           }
         }
       }
@@ -350,12 +320,12 @@
         }
       }
     },
-    "New conversations use the default agent. Current Device runs Ox on this device. Add pi running on another computer with `ox agent serve`, using its Tailscale name such as my-mac.tailnet.ts.net. It keeps Ox's tools and context. Long-press an agent to remove it." : {
+    "New conversations use the default agent. Add pi running on another computer with `ox agent serve`, using its Tailscale name such as my-mac.tailnet.ts.net. It keeps Ox's tools and context. Long-press an agent to remove it." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新对话使用默认智能体。当前设备在本机运行 Ox。可通过 `ox agent serve` 添加在另一台电脑上运行的 pi，并使用其 Tailscale 名称，例如 my-mac.tailnet.ts.net。它会保留 Ox 的工具和上下文。长按智能体可将其移除。"
+            "value" : "新对话使用默认智能体。可通过 `ox agent serve` 添加在另一台电脑上运行的 pi，并使用其 Tailscale 名称，例如 my-mac.tailnet.ts.net。它会保留 Ox 的工具和上下文。长按智能体可将其移除。"
           }
         }
       }
@@ -13454,6 +13424,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此 iPhone"
+          }
+        }
+      }
+    },
+    "This Mac" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 Mac"
           }
         }
       }

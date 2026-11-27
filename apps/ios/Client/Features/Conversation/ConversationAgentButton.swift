@@ -60,7 +60,7 @@ struct ConversationAgentButton: View {
                     if parent != nil {
                         Image(systemName: "arrow.turn.up.left")
                     }
-                    if agent != nil {
+                    if agentStatus != nil {
                         Image(systemName: "circle.fill")
                             .font(.system(size: 6))
                             .foregroundStyle(statusColor)
@@ -101,8 +101,8 @@ struct ConversationAgentButton: View {
 
     private var isCheckingAgent: Bool {
         switch agentStatus {
-        case .online, .offline: false
-        case .checking, nil: true
+        case .checking: true
+        case .online, .offline, nil: false
         }
     }
 
@@ -110,7 +110,8 @@ struct ConversationAgentButton: View {
         switch agentStatus {
         case .online: String(localized: "Online")
         case .offline: String(localized: "Offline")
-        case .checking, nil: agent == nil ? nil : String(localized: "Checking…")
+        case .checking: String(localized: "Checking…")
+        case nil: nil
         }
     }
 

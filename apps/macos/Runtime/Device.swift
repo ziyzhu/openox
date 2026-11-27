@@ -6,6 +6,7 @@ nonisolated enum Device {
     static let id = ProcessInfo.processInfo.hostName
     static var qualifiedID: String { "macos:\(id)" }
     static var name: String { Host.current().localizedName ?? id }
+    static var localAgentName: String { L10n.string("This Mac") }
     static var isInternal: Bool {
         #if DEBUG
         true

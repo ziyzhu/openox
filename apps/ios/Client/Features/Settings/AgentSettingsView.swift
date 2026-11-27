@@ -11,12 +11,12 @@ struct AgentSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayout.sectionSpacing) {
                 SettingsSection(
-                    footer: "New conversations use the default agent. Current Device runs Ox on this device. Add pi running on another computer with `ox agent serve`, using its Tailscale name such as my-mac.tailnet.ts.net. It keeps Ox's tools and context. Long-press an agent to remove it.",
+                    footer: "New conversations use the default agent. Add pi running on another computer with `ox agent serve`, using its Tailscale name such as my-mac.tailnet.ts.net. It keeps Ox's tools and context. Long-press an agent to remove it.",
                     layout: .group
                 ) {
                     VStack(spacing: 0) {
                         Button { setDefault(nil) } label: {
-                            row(title: Text("Current Device"), subtitle: L10n.string("Built in"), selected: directory.defaultEndpoint == nil)
+                            row(title: Device.localAgentName, subtitle: nil, selected: directory.defaultEndpoint == nil)
                         }
                         .buttonStyle(.plain)
                         .accessibilityElement(children: .combine)
@@ -57,7 +57,7 @@ struct AgentSettingsView: View {
                                 registry.select(model, in: client.id, region: selection.region)
                             }
                         } label: {
-                            SettingsDisclosureRow(title: "Model", value: DefaultAgentValue.model(registry))
+                            SettingsDisclosureRow(title: "Model", value: Text(verbatim: DefaultAgentValue.model(registry)))
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier(A11yID.Settings.defaultModel)
@@ -102,7 +102,7 @@ struct AgentSettingsView: View {
 
     private func remoteRow(_ agent: RemoteAgent) -> some View {
         Button { setDefault(agent.endpoint) } label: {
-            row(title: Text(verbatim: agent.name),
+            row(title: agent.name,
                 subtitle: "\(subtitle(directory.statuses[agent.endpoint])) · \(agent.endpoint.absoluteString)",
                 selected: directory.defaultEndpoint == agent.endpoint)
         }
@@ -128,17 +128,19 @@ struct AgentSettingsView: View {
         }
     }
 
-    private func row(title: Text, subtitle: String, selected: Bool) -> some View {
+    private func row(title: String, subtitle: String?, selected: Bool) -> some View {
         HStack(spacing: SettingsLayout.horizontalInset) {
             VStack(alignment: .leading, spacing: 2) {
-                title
+                Text(verbatim: title)
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurface)
-                Text(verbatim: subtitle)
-                    .font(Theme.Fonts.caption)
-                    .foregroundStyle(Theme.Colors.onSurfaceMuted)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                if let subtitle {
+                    Text(verbatim: subtitle)
+                        .font(Theme.Fonts.caption)
+                        .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
             }
             Spacer(minLength: 0)
             if selected {
@@ -220,10 +222,10 @@ struct RemoteAgentCreationSheet: View {
 
 enum DefaultAgentValue {
     @MainActor
-    static func model(_ registry: ProviderRegistry) -> Text {
-        guard let selection = registry.defaultModel else { return Text("Not configured") }
+    static func model(_ registry: ProviderRegistry) -> String {
+        guard let selection = registry.defaultModel else { return L10n.string("Not configured") }
         let client = registry.client(for: selection)
-        return Text(verbatim: registry.model(for: selection, client: client).displayName)
+        return registry.model(for: selection, client: client).displayName
     }
 }
 
@@ -232,7 +234,7 @@ struct DefaultAgentSettingsSection: View {
     private var registry: ProviderRegistry { .shared }
 
     private var value: Text {
-        guard let endpoint = directory.defaultEndpoint else { return Text("Current Device · \(DefaultAgentValue.model(registry))") }
+        guard let endpoint = directory.defaultEndpoint else { return Text(verbatim: "\(Device.localAgentName) · \(DefaultAgentValue.model(registry))") }
         let name = directory.displayName(for: endpoint)
         guard let model = directory.model(nil, endpoint: endpoint) else { return Text(verbatim: name) }
         return Text(verbatim: "\(name) · \(model.name)")

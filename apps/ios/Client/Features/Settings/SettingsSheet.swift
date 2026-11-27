@@ -344,11 +344,12 @@ struct SettingsSheet: View {
                 .font(.system(.body, weight: .medium))
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
                 .frame(width: 24)
+                .accessibilityLabel(Text(verbatim: profileLocation(profile.location)))
             VStack(alignment: .leading, spacing: 1) {
                 Text(verbatim: profile.name)
                     .font(Theme.Fonts.bodyMd)
                     .foregroundStyle(Theme.Colors.onSurface)
-                Text(verbatim: "\(profileLocation(profile.location)) · \(agentName(profile))")
+                Text(verbatim: agentName(profile))
                     .font(Theme.Fonts.caption)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
@@ -387,7 +388,7 @@ struct SettingsSheet: View {
         let name = profile.id == storage.activeId
             ? directory.defaultEndpoint.map(directory.displayName(for:))
             : profileAgentNames[profile.id] ?? nil
-        return name ?? L10n.string("Current Device")
+        return name ?? Device.localAgentName
     }
 
 }
@@ -462,6 +463,7 @@ struct ProfileCapabilitiesSection: View {
                     SettingsDisclosureRow(title: "Secrets", value: Text(""))
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier(A11yID.Settings.secrets)
             }
         }
     }

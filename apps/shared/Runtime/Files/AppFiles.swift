@@ -197,7 +197,7 @@ extension Conversation {
             guard next != current else { return }
             let added = next.agents.filter { !current.agents.contains($0) }
             let removed = current.agents.filter { !next.agents.contains($0) }
-            let defaultName = next.defaultEndpoint.map { endpoint in next.agents.first { $0.endpoint == endpoint }?.name ?? endpoint.absoluteString } ?? L10n.string("Current Device")
+            let defaultName = next.defaultEndpoint.map { endpoint in next.agents.first { $0.endpoint == endpoint }?.name ?? endpoint.absoluteString } ?? Device.localAgentName
             let summary = (added.map { L10n.string("Add \($0.name) at \($0.endpoint.absoluteString)") }
                 + removed.map { L10n.string("Remove \($0.name)") }
                 + (next.defaultEndpoint != current.defaultEndpoint ? [L10n.string("Default: \(defaultName)")] : []))

@@ -225,7 +225,7 @@ struct ProfileSettingsView: View {
 
     private var inactiveAgentSection: some View {
         SettingsSection(footer: "Use this Profile to change its agent, permissions, services, and secrets.", layout: .row) {
-            SettingsDisclosureRow(title: "Default agent", value: Text(verbatim: inactiveAgentName ?? L10n.string("Current Device")), indicator: nil)
+            SettingsDisclosureRow(title: "Default agent", value: Text(verbatim: inactiveAgentName ?? Device.localAgentName), indicator: nil)
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier(A11yID.Settings.defaultAgent)
         }

@@ -47,7 +47,7 @@ struct AgentSelectionGroup: View {
             VStack(spacing: 0) {
                 Menu {
                     Button { select(nil) } label: {
-                        Label { Text("Current Device") } icon: { if conversation.remoteAgent == nil { Image(systemName: "checkmark") } }
+                        Label { Text(verbatim: Device.localAgentName) } icon: { if conversation.remoteAgent == nil { Image(systemName: "checkmark") } }
                     }
                     .accessibilityIdentifier(A11yID.ConversationControls.agentOption("local"))
                     ForEach(agents.agents) { agent in
@@ -67,7 +67,7 @@ struct AgentSelectionGroup: View {
                     }
                     .accessibilityIdentifier(A11yID.ConversationControls.agentAdd)
                 } label: {
-                    SettingsDisclosureRow(title: "Agent", value: conversation.remoteAgentName.map { Text(verbatim: $0) } ?? Text("Current Device"),
+                    SettingsDisclosureRow(title: "Agent", value: conversation.remoteAgentName.map { Text(verbatim: $0) } ?? Text(verbatim: Device.localAgentName),
                                           indicator: conversation.canChangeAgent ? "chevron.up.chevron.down" : nil)
                 }
                 .disabled(!conversation.canChangeAgent)

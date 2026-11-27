@@ -93,6 +93,7 @@ nonisolated enum A11yID {
         static func agentRemove(_ id: String) -> String { "settings.agents.remove.\(id)" }
         static let actions = "settings.actions"
         static let services = "settings.services"
+        static let secrets = "settings.secrets"
         static let builtInActions = "settings.actions.builtIn"
         static let memory = "settings.memory"
         static let memoryEditor = "settings.memoryEditor"
