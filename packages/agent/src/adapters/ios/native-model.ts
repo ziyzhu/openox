@@ -21,6 +21,13 @@ function nativeTranscript(transcript: TranscriptContext, systemUpdates: boolean)
   return { systemPrompt: initial ? getSystemMessageText(initial) : "", messages: ordered };
 }
 
+const TRUNCATED_TOOL_CALL = "The reply reached its size limit before its tool call finished, so the tool was not run. Send a message to continue.";
+
+function failTruncatedToolCalls(event: AssistantMessageEvent): AssistantMessageEvent {
+  if (event.type !== "done" || event.reason !== "length" || !event.message.content.some((block) => block.type === "toolCall")) return event;
+  return { type: "error", reason: "error", error: { ...event.message, stopReason: "error", errorMessage: TRUNCATED_TOOL_CALL } };
+}
+
 export function nativeStream(reference: ConversationReference, model: Model<Api>, transcript: TranscriptContext, systemUpdates: boolean, options?: SimpleStreamOptions) {
   const output = createAssistantMessageEventStream();
   let terminal = false;
@@ -34,7 +41,7 @@ export function nativeStream(reference: ConversationReference, model: Model<Api>
       await native("nativeModel", { conversationID: reference.conversationID, reference, purpose, streamOptions: { maxTokens: options?.maxTokens, cacheRetention: options?.cacheRetention },
         tools, ...nativeTranscript(transcript, systemUpdates) },
       options?.signal, value => {
-        const event = value as AssistantMessageEvent;
+        const event = failTruncatedToolCalls(value as AssistantMessageEvent);
         if (terminal) {
           void native("report", { message: "Native provider emitted after its terminal event; ignored" }).catch(() => {});
           return;

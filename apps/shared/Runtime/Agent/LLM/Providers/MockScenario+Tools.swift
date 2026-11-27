@@ -132,20 +132,11 @@ extension Scenario {
         execute("await new Promise(() => {});"),
     ])
 
-    static let truncatedToolCall = Scenario(name: "truncated-tool") { ctx in
-        if ctx.turn == 0 {
-            return [
-                .say("Attempting an incomplete tool call…\n"),
-                execute("console.log(\"TRUNCATED_TOOL_EXECUTED\");"),
-                .stop(.length),
-            ]
-        }
-        let result = ctx.resultText("execute") ?? ""
-        if result.contains("was not executed"), result.contains("output token limit") {
-            return [.say("Truncated tool call was blocked before execution."), .stop(.stop)]
-        }
-        return [.say("Truncated tool safety check failed: \(result)"), .stop(.stop)]
-    }
+    static let truncatedToolCall = Scenario(name: "truncated-tool", steps: [
+        .say("Attempting an incomplete tool call…\n"),
+        execute("console.log(\"TRUNCATED_TOOL_EXECUTED\");"),
+        .stop(.length),
+    ])
 
     static let pendingStopReason = Scenario(name: "pending-stop", steps: [
         .say("This response must not settle successfully."),

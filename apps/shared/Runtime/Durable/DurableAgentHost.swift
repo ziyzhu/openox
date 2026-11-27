@@ -4,6 +4,7 @@ import Synchronization
 
 actor DurableAgentHost {
     typealias EventSink = @Sendable (AgentEvent) async -> Void
+    private static let outputByteLimit = 128 * 1024
     nonisolated private struct ToolGeneration: Sendable {
         let context: AgentContext
         let assistant: AssistantMessage
@@ -163,6 +164,24 @@ actor DurableAgentHost {
         }
     }
 
+    private static func outputDelta(_ event: AssistantEvent) -> String {
+        switch event {
+        case .textDelta(_, let delta, _), .thinkingDelta(_, let delta, _), .toolCallDelta(_, let delta, _): delta
+        default: ""
+        }
+    }
+
+    private static func endedAtOutputLimit(_ event: AssistantEvent) -> AssistantEvent? {
+        switch event {
+        case .textDelta(_, _, let partial), .thinkingDelta(_, _, let partial), .toolCallDelta(_, _, let partial):
+            var message = partial
+            message.stopReason = .length
+            return .done(reason: .length, message: message)
+        default:
+            return nil
+        }
+    }
+
     private func perform(_ method: String, fields: [String: JSONValue], conversationID: Int, binding: Binding,
                          runtime: DurableRuntime, stream: @escaping @Sendable (JSONValue) -> Void) async throws -> JSONValue {
         switch method {
@@ -227,8 +246,12 @@ actor DurableAgentHost {
                                                 options: options)
             let media = inputs.footprint
             Log.agent.info("PiDurable native model start durable=\(conversationID) profile=\(binding.runtimeProfileID) provider=\(config.client.id) model=\(config.model.id) messages=\(messages.count) tools=\(tools.count) mediaFiles=\(media.files) mediaBytes=\(media.bytes)")
-            for try await event in response {
+            var outputBytes = 0
+            for try await received in response {
                 try Task.checkCancellation()
+                outputBytes += Self.outputDelta(received).utf8.count
+                let limited = outputBytes > Self.outputByteLimit ? Self.endedAtOutputLimit(received) : nil
+                let event = limited ?? received
                 switch event {
                 case .textDelta(_, let delta, _) where !delta.isEmpty:
                     markFirst(.firstToken)
@@ -249,6 +272,10 @@ actor DurableAgentHost {
                     }
                 }
                 stream(DurableMessageCodec.event(event, provider: "ox-native:\(conversationID)"))
+                if limited != nil {
+                    Log.agent.warning("PiDurable native output limit durable=\(conversationID) provider=\(config.client.id) model=\(config.model.id) bytes=\(outputBytes)")
+                    break
+                }
             }
             Log.agent.info("PiDurable native model complete durable=\(conversationID) profile=\(binding.runtimeProfileID) provider=\(config.client.id)")
             return .null
