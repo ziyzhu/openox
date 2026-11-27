@@ -246,6 +246,7 @@ private struct SidebarRow: View {
     let edgeInset: CGFloat
     let onPress: () -> Void
     let onTap: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: onTap) {
@@ -257,6 +258,8 @@ private struct SidebarRow: View {
                         .lineLimit(2)
                         .truncationMode(.tail)
                         .multilineTextAlignment(.leading)
+                        .contentTransition(.opacity)
+                        .animation(reduceMotion ? nil : Theme.Animation.standard, value: meta.displayTitle)
                     TimelineView(.everyMinute) { context in
                         Text(verbatim: [lastModifiedText(relativeTo: context.date), agentName].compactMap { $0 }.joined(separator: " · "))
                             .font(Theme.Fonts.bodySm)
@@ -267,6 +270,7 @@ private struct SidebarRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: Theme.Spacing.sm) {
                     activityIndicator
+                        .transition(.opacity.combined(with: .scale(scale: 0.8)))
                     if meta.scheduleID != nil {
                         Image(systemName: "clock")
                             .font(.system(.body, weight: .medium))
@@ -274,6 +278,7 @@ private struct SidebarRow: View {
                             .accessibilityHidden(true)
                     }
                 }
+                .animation(reduceMotion ? nil : Theme.Animation.standard, value: activity)
             }
         }
         .buttonStyle(SidebarRowButtonStyle(isActive: isActive, edgeInset: edgeInset, onPress: onPress))
@@ -393,6 +398,7 @@ private struct SidebarRowButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                     .fill(Theme.Colors.onSurface.opacity(tinted ? 0.08 : 0))
             }
+            .pressedSurface(configuration.isPressed, dims: false)
             .padding(.horizontal, edgeInset - Theme.Spacing.sm)
             .padding(.vertical, 2)
             .contentShape(Rectangle())

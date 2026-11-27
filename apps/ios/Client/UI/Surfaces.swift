@@ -31,8 +31,8 @@ extension View {
         contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
     }
 
-    func pressedSurface(_ isPressed: Bool) -> some View {
-        opacity(isPressed ? 0.7 : 1.0)
+    func pressedSurface(_ isPressed: Bool, dims: Bool = true) -> some View {
+        modifier(PressedSurface(isPressed: isPressed, dims: dims))
     }
 
     func minimumTouchTarget(alignment: Alignment = .center) -> some View {
@@ -42,6 +42,19 @@ extension View {
             alignment: alignment
         )
         .contentShape(Rectangle())
+    }
+}
+
+private struct PressedSurface: ViewModifier {
+    let isPressed: Bool
+    let dims: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(isPressed && dims ? 0.7 : 1)
+            .scaleEffect(isPressed && !reduceMotion ? Theme.Scale.pressed : 1)
+            .animation(reduceMotion ? nil : Theme.Animation.press, value: isPressed)
     }
 }
 

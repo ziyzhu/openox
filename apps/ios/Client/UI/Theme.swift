@@ -103,6 +103,10 @@ enum Theme {
         static let readable: CGFloat = 700
     }
 
+    enum Scale {
+        static let pressed: CGFloat = 0.97
+    }
+
     enum Animation {
         static let press = SwiftUI.Animation.smooth(duration: 0.12)
         static let quick = SwiftUI.Animation.smooth(duration: 0.15)

@@ -495,7 +495,7 @@ private struct SkillBubble: View {
                 .conversationCardOutline(cornerRadius: Theme.Radius.xl)
                 .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(OxPressedSurfaceButtonStyle())
         .accessibilityLabel("/\(skill.displayName), \(skill.description)")
         .accessibilityIdentifier(A11yID.ConversationControls.Message.skill(skill.name))
     }
@@ -586,7 +586,7 @@ struct QueuedBubble: View {
                 .font(Theme.Fonts.caption)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(OxPressedSurfaceButtonStyle())
             .padding(.trailing, 4)
             .accessibilityLabel(L10n.string("Cancel queued message", comment: "Accessibility label for the button that cancels a message queued while the agent is working."))
         }
@@ -863,7 +863,7 @@ struct BlockView: View, Equatable {
         Button { onOpenAttachment(file) } label: {
             ConversationFileRow(file: file, previewSourceID: sourceID)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(OxPressedSurfaceButtonStyle())
         .modifier(ConversationInteractiveRowSurface())
         .accessibilityLabel(file.userFacingAccessibilityLabel)
         .accessibilityIdentifier(A11yID.ConversationControls.Message.file(file.id))
@@ -901,7 +901,7 @@ struct ResponseFooterBlockView: View, Equatable {
             ShareLink(item: shareText) {
                 controlIcon(systemName: "square.and.arrow.up")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(OxPressedSurfaceButtonStyle())
             .accessibilityLabel(A11yLabel.shareMessage)
             .accessibilityIdentifier(actionIdentifier(A11yID.ConversationControls.Message.share))
             if controls.canBranch {
@@ -944,7 +944,7 @@ struct ResponseFooterBlockView: View, Equatable {
         Button(action: action) {
             controlIcon(systemName: systemName)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(OxPressedSurfaceButtonStyle())
         .accessibilityLabel(label)
         .accessibilityIdentifier(id)
     }
@@ -984,7 +984,7 @@ struct FollowIntentList: View {
                     .frame(minHeight: Theme.Size.minimumTouchTarget)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(OxPressedSurfaceButtonStyle())
                 .accessibilityIdentifier(A11yID.ConversationControls.followIntent)
             }
         }

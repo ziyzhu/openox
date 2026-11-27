@@ -72,7 +72,7 @@ private struct DiffFileSection: View {
                 .frame(maxWidth: .infinity, minHeight: Theme.Size.minimumTouchTarget, alignment: .leading)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(OxPressedSurfaceButtonStyle())
             .padding(.horizontal, Theme.Spacing.lg)
             .accessibilityIdentifier(accessibilityIdentifier)
             .accessibilityValue(expanded ? "Expanded" : "Collapsed")

@@ -82,6 +82,8 @@ struct AgentSelectionGroup: View {
                             Label {
                                 Text(verbatim: agent.name)
                                 Text(verbatim: subtitle(agent))
+                                    .contentTransition(.opacity)
+                                    .animation(Theme.Animation.standard, value: subtitle(agent))
                             } icon: {
                                 if conversation.remoteAgent?.endpoint == agent.endpoint { Image(systemName: "checkmark") }
                             }

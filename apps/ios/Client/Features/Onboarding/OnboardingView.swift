@@ -350,5 +350,6 @@ struct OnboardingCTAButton: ButtonStyle {
                 configuration.isPressed ? Theme.Colors.primaryPressed : Theme.Colors.primary,
                 in: Capsule(style: .continuous)
             )
+            .pressedSurface(configuration.isPressed, dims: false)
     }
 }

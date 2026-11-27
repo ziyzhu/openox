@@ -438,6 +438,7 @@ struct ProfileCapabilitiesSection: View {
                         title: "Services",
                         value: Text(verbatim: "\(serviceManager.services.count)")
                     )
+                    .animation(Theme.Animation.standard, value: serviceManager.services.count)
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier(A11yID.Settings.services)
@@ -451,6 +452,7 @@ struct ProfileCapabilitiesSection: View {
                         title: "Repositories",
                         value: Text("\(serviceManager.repositories.count(where: \.isEnabled)) enabled")
                     )
+                    .animation(Theme.Animation.standard, value: serviceManager.repositories.count(where: \.isEnabled))
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier(A11yID.Settings.server)

@@ -154,7 +154,7 @@ struct LivePageCard: View {
             Button(action: activate) {
                 placeholderContent
             }
-            .buttonStyle(.plain)
+            .buttonStyle(OxPressedSurfaceButtonStyle())
             .accessibilityLabel(String(localized: "View live page"))
         } else {
             placeholderContent

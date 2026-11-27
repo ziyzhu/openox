@@ -94,7 +94,7 @@ struct ThinkingRow: View {
             .padding(.trailing, 10)
             .dashedChipOutline()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(OxPressedSurfaceButtonStyle())
         .frame(minHeight: Theme.Size.minimumTouchTarget)
         .contentShape(Rectangle())
         .accessibilityLabel(Text(verbatim: "\(L10n.string("New conversation")): \(title)"))
@@ -133,7 +133,7 @@ struct ThinkingRow: View {
                     Button { isExpanded = true } label: {
                         rowHeader
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(OxPressedSurfaceButtonStyle())
                     .accessibilityLabel(accessibilityLabel)
                     let changes = changes
                     if !sources.isEmpty || !changes.conversations.isEmpty || !changes.schedules.isEmpty || !changes.skills.isEmpty {
@@ -430,7 +430,7 @@ private struct TraceRow: View {
                             )
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(OxPressedSurfaceButtonStyle())
                     if let sources = InvocationFormat.sources(invocation, serviceManager: serviceManager) {
                         SourceChipList(sources: sources) { source in
                             SourceChipButton(source: source, accessibilityIdentifier: "conversation.step.\(invocation.id).source.\(source.id)") {
@@ -603,7 +603,7 @@ private struct SourceChipButton: View {
         } label: {
             SourceChip(source: source, label: conversationTitle ?? source.label)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(OxPressedSurfaceButtonStyle())
         .frame(minHeight: Theme.Size.minimumTouchTarget)
         .contentShape(Rectangle())
         .accessibilityLabel(conversationTitle ?? source.accessibilityLabel)

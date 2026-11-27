@@ -57,7 +57,7 @@ struct ImageWidgetView: View {
                     .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                     .frame(maxWidth: 320 * loaded.size.width / max(loaded.size.height, 1))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(OxPressedSurfaceButtonStyle())
             .accessibilityLabel("Open image")
             .accessibilityHint("Pinch or double-tap to zoom")
             .accessibilityIdentifier(A11yID.ConversationControls.Message.imageOpen)
@@ -76,7 +76,7 @@ struct ImageWidgetView: View {
                 .frame(height: 160)
                 .placeholderCard()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(OxPressedSurfaceButtonStyle())
             .accessibilityIdentifier(A11yID.ConversationControls.Message.imageRetry)
         }
     }

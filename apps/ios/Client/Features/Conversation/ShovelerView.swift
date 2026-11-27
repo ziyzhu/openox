@@ -80,7 +80,7 @@ private struct ShovelerCardContainer: View {
                 cardView
                     .filePreviewTransitionSource(file, sourceID: sourceID)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(OxPressedSurfaceButtonStyle())
             .accessibilityIdentifier(sourceID)
             .accessibilityHint(String(format: L10n.string("Opens %@"), file.userFacingName))
         } else {

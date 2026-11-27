@@ -594,7 +594,7 @@ struct ConversationComposer: View, Equatable {
                 }
                 .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(OxPressedSurfaceButtonStyle())
         .minimumTouchTarget()
         .accessibilityIdentifier(A11yID.ConversationControls.importMemory)
     }
@@ -868,7 +868,7 @@ struct ConversationComposer: View, Equatable {
                 .frame(width: iconButtonSize, height: iconButtonSize)
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(OxPressedSurfaceButtonStyle())
         .accessibilityLabel(L10n.string("Cancel voice input", comment: "Accessibility label for the button that discards an in-progress voice recording."))
         .accessibilityIdentifier(A11yID.ConversationControls.speechCancel)
     }
@@ -997,7 +997,7 @@ struct ConversationComposer: View, Equatable {
                 .padding(.vertical, 5)
                 .minimumTouchTarget()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(OxPressedSurfaceButtonStyle())
         .accessibilityLabel(label)
         .accessibilityIdentifier(id)
     }
@@ -1184,7 +1184,7 @@ private struct ComposerAttachmentChip<Preview: View>: View {
                     )
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(OxPressedSurfaceButtonStyle())
             .accessibilityLabel(A11yLabel.remove(name))
             .accessibilityIdentifier("\(accessibilityIdentifier).remove")
         }

@@ -189,7 +189,7 @@ private struct AttachMenuCard: View {
             .padding(.vertical, Theme.Spacing.sm)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(OxPressedSurfaceButtonStyle())
         .accessibilityIdentifier(a11yID)
     }
 }
@@ -258,7 +258,7 @@ private struct ServicePickerPanel: View {
             .padding(.bottom, 2)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(OxPressedSurfaceButtonStyle())
         .accessibilityLabel("Services")
         .accessibilityIdentifier(A11yID.ConversationControls.Attach.explore)
     }
@@ -285,7 +285,7 @@ private struct ServicePickerPanel: View {
         } else {
             ForEach(results) { match in
                 Button { onSelect(match.service) } label: { row(match) }
-                    .buttonStyle(.plain)
+                    .buttonStyle(OxPressedSurfaceButtonStyle())
                     .accessibilityIdentifier(A11yID.ConversationControls.mention(match.service.domain))
             }
             if isLoadingServices {
@@ -352,7 +352,7 @@ private struct SlashPickerPanel: View {
             VStack(spacing: 0) {
                 ForEach(suggestions) { skill in
                     Button { onSelect(skill) } label: { row(skill) }
-                        .buttonStyle(.plain)
+                        .buttonStyle(OxPressedSurfaceButtonStyle())
                         .accessibilityIdentifier(A11yID.ConversationControls.skill(skill.name))
                 }
             }

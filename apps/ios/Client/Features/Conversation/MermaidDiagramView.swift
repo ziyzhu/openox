@@ -44,7 +44,7 @@ struct MermaidDiagramView<Fallback: View>: View {
                     .scaledToFit()
                     .frame(maxWidth: image.size.width)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(OxPressedSurfaceButtonStyle())
             .accessibilityLabel("Open diagram")
             .accessibilityHint("Pinch or double-tap to zoom")
             .accessibilityIdentifier("\(accessibilityIdentifier).diagram")

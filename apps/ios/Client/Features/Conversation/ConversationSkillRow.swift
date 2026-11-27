@@ -33,7 +33,7 @@ struct ConversationSkillRow: View {
             .padding(.trailing, 10)
             .dashedChipOutline()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(OxPressedSurfaceButtonStyle())
         .frame(minHeight: Theme.Size.minimumTouchTarget)
         .contentShape(Rectangle())
         .accessibilityLabel(Text(verbatim: "/\(displayedSkill.displayName)"))

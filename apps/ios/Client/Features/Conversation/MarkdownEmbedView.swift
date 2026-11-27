@@ -56,7 +56,7 @@ struct MarkdownEmbedView: View {
             Button { open() } label: {
                 FileCardView(file: file, footer: .name)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(OxPressedSurfaceButtonStyle())
             .accessibilityHint(String(format: L10n.string("Opens %@"), file.userFacingName))
             .accessibilityIdentifier(A11yID.ConversationControls.Message.file(file.id))
         case .removed:

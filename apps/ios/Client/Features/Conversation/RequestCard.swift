@@ -149,7 +149,7 @@ struct PermissionRequestCard: View {
                             .frame(width: 18, height: 18)
                             .minimumTouchTarget()
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(OxPressedSurfaceButtonStyle())
                     .frame(width: 18, height: 18)
                     .accessibilityLabel("View arguments")
                     .accessibilityIdentifier("conversation.permissionArguments")
@@ -484,7 +484,7 @@ struct RequestCardOptions: View {
                         .background(Theme.Colors.primary, in: Circle())
                         .minimumTouchTarget()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(OxPressedSurfaceButtonStyle())
                 .accessibilityLabel(A11yLabel.send)
                 .accessibilityIdentifier(A11yID.ConversationControls.choiceCustomSubmit)
             }

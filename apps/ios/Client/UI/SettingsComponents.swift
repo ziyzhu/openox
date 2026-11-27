@@ -113,6 +113,7 @@ struct SettingsDisclosureRow: View {
                 value
                     .font(Theme.Fonts.bodySm)
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
+                    .contentTransition(.numericText())
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .truncationMode(.middle)

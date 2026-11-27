@@ -172,7 +172,7 @@ struct ConversationMapScreen: View {
             .frame(minHeight: Theme.Size.minimumTouchTarget)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(OxPressedSurfaceButtonStyle())
     }
 
     private func routeSummary(_ index: Int) -> String {
@@ -412,7 +412,7 @@ private struct ConversationMapRouteSheet: View {
             }
             .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(OxPressedSurfaceButtonStyle())
         .accessibilityAddTraits(isChosen ? .isSelected : [])
         .accessibilityIdentifier("conversation.map.routeDetail.option.\(index)")
     }

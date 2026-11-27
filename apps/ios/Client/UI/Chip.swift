@@ -1,8 +1,6 @@
 import SwiftUI
 
 struct OxChipButton: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var filled: Bool = true
     var primaryFill = Theme.Colors.primary
     var secondaryFill = Theme.Colors.surfaceSunken
@@ -17,7 +15,7 @@ struct OxChipButton: ButtonStyle {
             )
             .minimumTouchTarget()
             .animation(nil, value: filled)
-            .animation(reduceMotion ? nil : Theme.Animation.press, value: configuration.isPressed)
+            .pressedSurface(configuration.isPressed, dims: false)
     }
 }
 
