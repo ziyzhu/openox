@@ -77,19 +77,20 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
         let output: ModelOutput
         let diagnosticContent: JSONValue?
         var logs: [VirtualMachineLog]
+        var returned: String?
         var failure: String?
+        let started = ContinuousClock.now
         do {
             let out = try await session.virtualMachine.run(source: source, bridge: session) { attachment in
                 try session.appendTransientAttachment(attachment)
             }
             logs = out.logs
-            if let value = out.value {
-                logs.append(VirtualMachineLog(level: "log", message: value.stringValue ?? value.jsonString()))
-            }
+            returned = out.value.map { $0.stringValue ?? $0.jsonString() }
         } catch {
             logs = (error as? VirtualMachine.Error)?.logs ?? []
             failure = error.localizedDescription
         }
+        let wallTime = ContinuousClock.now - started
         let attachments = session.executionAttachments()
         let activatedSkills = session.executionActivatedSkills()
         let invocations = session.executionInvocations()
@@ -97,12 +98,12 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
             failure = "\(error)\n\n\(try Self.failureReceipt(invocations, omittedCalls: session.executionOmittedInvocations()))"
         }
         do {
-            output = try await modelOutput(logs: logs, error: failure, store: session.javaScriptOutputs)
+            output = try await modelOutput(logs: logs, returned: returned, error: failure, wallTime: wallTime, store: session.javaScriptOutputs)
         } catch {
             failure = error.localizedDescription
             output = ModelOutput(text: "[error] \(error.localizedDescription)\n\n\(try Self.failureReceipt(invocations, omittedCalls: session.executionOmittedInvocations()))", truncated: true)
         }
-        diagnosticContent = output.truncated ? nil : await logOutput(logs: logs, error: failure)
+        diagnosticContent = output.truncated ? nil : await logOutput(logs: logs + (returned.map { [VirtualMachineLog(level: "log", message: $0)] } ?? []), error: failure)
         let failed = failure != nil
         Log.session.info("tool.output maxOutputTokens=\(JavaScriptOutputLimits.maxOutputTokens) outputBytes=\(output.text.utf8.count) truncated=\(output.truncated)")
         if failed, let note = failureNote?(failure ?? output.text) { try? session.appendReportedProgress(note) }
@@ -130,15 +131,18 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
     }
 
     @concurrent
-    private func modelOutput(logs: [VirtualMachineLog], error: String?, store: JavaScriptOutputStore) async throws -> ModelOutput {
-        var lines = logs.map { log in
-            log.level == "log" ? log.message : "[\(log.level)] \(log.message)"
+    private func modelOutput(logs: [VirtualMachineLog], returned: String?, error: String?, wallTime: Duration, store: JavaScriptOutputStore) async throws -> ModelOutput {
+        var items = returned.map { [$0] } ?? []
+        if !logs.isEmpty {
+            let console = logs.map { $0.level == "log" ? $0.message : "[\($0.level)] \($0.message)" }
+            items.append("<console_output>\n\(console.joined(separator: "\n"))\n</console_output>")
         }
-        if let error { lines.append("[error] \(error)") }
-        let output = lines.joined(separator: "\n")
-        guard !output.isEmpty else { return ModelOutput(text: "(no output)", truncated: false) }
+        if let error { items.append("Script error:\n\(error)") }
+        let output = items.joined(separator: "\n")
+        let seconds = Double(wallTime.components.seconds) + Double(wallTime.components.attoseconds) * 1e-18
+        let header = "\(error == nil ? "Script completed" : "Script failed")\nWall time \(String(format: "%.1f", seconds)) seconds\nOutput:\n"
         guard let excerpt = JavaScriptOutputLimits.excerpt(output) else {
-            return ModelOutput(text: output, truncated: false)
+            return ModelOutput(text: header + output, truncated: false)
         }
         var path = JSONValue.null
         var saveError = JSONValue.null
@@ -157,7 +161,7 @@ nonisolated final class ConversationTool: AgentTool, @unchecked Sendable {
             "truncatedTokens": .int(JavaScriptOutputLimits.tokens(characters: omitted)),
             "path": path, "saveError": saveError,
         ]))
-        return ModelOutput(text: text, truncated: true)
+        return ModelOutput(text: header + text, truncated: true)
     }
 
     @concurrent

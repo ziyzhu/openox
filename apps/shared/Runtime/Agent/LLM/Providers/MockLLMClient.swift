@@ -193,10 +193,17 @@ public struct TurnContext: Sendable {
         let scoped = toolName.map { name in toolResults.filter { $0.toolName == name } } ?? toolResults
         return scoped.compactMap { result in
             for block in result.content {
-                if case .text(let t) = block { return t.text }
+                if case .text(let t) = block { return Self.scriptOutput(t.text) }
             }
             return nil
         }
+    }
+
+    private static func scriptOutput(_ text: String) -> String {
+        guard text.hasPrefix("Script "), let body = text.range(of: "\nOutput:\n") else { return text }
+        return String(text[body.upperBound...])
+            .replacingOccurrences(of: "<console_output>\n", with: "")
+            .replacingOccurrences(of: "\n</console_output>", with: "")
     }
 
     public var transientContext: String {

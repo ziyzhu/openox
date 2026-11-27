@@ -164,7 +164,7 @@ extension Scenario {
                     pending = Set(assistant.content.toolCalls.map(\.id))
                 case .toolResult(let result):
                     guard pending.remove(result.toolCallId) != nil else { return [.say("Compaction orphaned a tool result."), .stop(.stop)] }
-                    if result.content.concatenatedText.hasPrefix("EARLY_STEP_") { return [.say("Compaction retained the early tool result."), .stop(.stop)] }
+                    if result.content.concatenatedText.contains("EARLY_STEP_") { return [.say("Compaction retained the early tool result."), .stop(.stop)] }
                     skillRestored = skillRestored || result.activatedSkills.contains { $0.path == "skills/visualize/SKILL.md" }
                 case .system:
                     break
