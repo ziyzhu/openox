@@ -537,7 +537,7 @@ private struct SourceChip: View {
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .frame(width: 16, height: 20)
             case .conversation:
-                Image(systemName: "bubble.left.and.bubble.right")
+                Image(systemName: "bubble.left")
                     .foregroundStyle(Theme.Colors.onSurfaceMuted)
                     .frame(width: 16, height: 20)
             case .domain(let domain):
