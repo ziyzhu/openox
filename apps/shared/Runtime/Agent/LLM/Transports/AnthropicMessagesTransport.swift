@@ -196,7 +196,7 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
                     } else {
                         toolArguments[index] = ""
                     }
-                    assembler.updateToolCall(at: slot, toolCall(index))
+                    assembler.toolCallDelta(at: slot, toolArguments[index] ?? "")
                 default:
                     break
                 }
@@ -212,10 +212,9 @@ nonisolated struct AnthropicMessagesTransport: ProviderClient {
                 case "signature_delta":
                     thinkingSignatures[index, default: ""] += delta["signature"] as? String ?? ""
                 case "input_json_delta":
-                    toolArguments[index, default: ""] += delta["partial_json"] as? String ?? ""
-                    if let slot = contentSlots[index] {
-                        assembler.updateToolCall(at: slot, toolCall(index))
-                    }
+                    let fragment = delta["partial_json"] as? String ?? ""
+                    toolArguments[index, default: ""] += fragment
+                    if let slot = contentSlots[index] { assembler.toolCallDelta(at: slot, fragment) }
                 default:
                     break
                 }

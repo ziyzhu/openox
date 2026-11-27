@@ -425,7 +425,7 @@ nonisolated private final class Replayer: @unchecked Sendable {
                         let call = ToolCall(id: "mock-\(toolSeq)", name: name, arguments: args)
                         let idx = partial.content.count
                         partial.content.append(.toolCall(call))
-                        continuation.yield(.toolCallDelta(index: idx, partial: partial))
+                        continuation.yield(.toolCallDelta(index: idx, delta: args.jsonString(), partial: partial))
                         continuation.yield(.toolCallEnd(index: idx, toolCall: call, partial: partial))
                         stopReason = .toolUse
 

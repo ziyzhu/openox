@@ -276,7 +276,7 @@ nonisolated struct StreamAssembler {
         endThinking()
         let idx = message.content.count
         message.content.append(.toolCall(call))
-        continuation.yield(.toolCallDelta(index: idx, partial: message))
+        continuation.yield(.toolCallDelta(index: idx, delta: call.arguments.jsonString(), partial: message))
         continuation.yield(.toolCallEnd(index: idx, toolCall: call, partial: message))
     }
 
@@ -288,10 +288,10 @@ nonisolated struct StreamAssembler {
         return idx
     }
 
-    mutating func updateToolCall(at idx: Int, _ call: ToolCall) {
+    mutating func toolCallDelta(at idx: Int, _ delta: String) {
+        guard !delta.isEmpty else { return }
         markFirstToken()
-        message.content[idx] = .toolCall(call)
-        continuation.yield(.toolCallDelta(index: idx, partial: message))
+        continuation.yield(.toolCallDelta(index: idx, delta: delta, partial: message))
     }
 
     mutating func endToolCall(at idx: Int, _ call: ToolCall) {

@@ -426,7 +426,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
                     functionCallItemIds[outputIndex] = item["id"] as? String
                     if !(functionCallArgBuffers[outputIndex] ?? "").isEmpty {
                         assembler.start()
-                        assembler.updateToolCall(at: functionCallSlots[outputIndex]!, functionCall(outputIndex))
+                        assembler.toolCallDelta(at: functionCallSlots[outputIndex]!, functionCallArgBuffers[outputIndex] ?? "")
                     }
                 default: break
                 }
@@ -448,7 +448,7 @@ public struct OpenAIResponsesTransport: ProviderClient {
                 if let itemID = evt["item_id"] as? String { functionCallItemIds[outputIndex] = itemID }
                 functionCallArgBuffers[outputIndex, default: ""] += delta
                 assembler.start()
-                assembler.updateToolCall(at: functionCallSlots[outputIndex]!, functionCall(outputIndex))
+                assembler.toolCallDelta(at: functionCallSlots[outputIndex]!, delta)
             case "response.function_call_arguments.done":
                 guard let outputIndex = evt["output_index"] as? Int else { break }
                 if functionCallSlots[outputIndex] == nil {

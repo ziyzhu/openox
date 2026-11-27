@@ -302,9 +302,9 @@ public struct OpenAIChatTransport: ProviderClient {
                                 }
                                 if let a = fn["arguments"] as? String, !a.isEmpty {
                                     toolCallArgBuffers[slot, default: ""] += a
+                                    assembler.toolCallDelta(at: toolCallSlots[slot]!, a)
                                 }
                             }
-                            assembler.updateToolCall(at: toolCallSlots[slot]!, slotToolCall(slot))
                         }
                     }
                 }

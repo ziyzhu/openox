@@ -269,7 +269,7 @@ nonisolated enum DurableMessageCodec {
         case .start(let message): return .object(["type": .string("start"), "partial": partial(message)])
         case .textDelta(let index, let delta, let message): return .object(["type": .string("text_delta"), "contentIndex": .int(index), "delta": .string(delta), "partial": partial(message)])
         case .thinkingDelta(let index, let delta, let message): return .object(["type": .string("thinking_delta"), "contentIndex": .int(index), "delta": .string(delta), "partial": partial(message)])
-        case .toolCallDelta(let index, let message): return .object(["type": .string("toolcall_delta"), "contentIndex": .int(index), "delta": .string(""), "partial": partial(message)])
+        case .toolCallDelta(let index, let delta, let message): return .object(["type": .string("toolcall_delta"), "contentIndex": .int(index), "delta": .string(delta), "partial": partial(message)])
         case .textEnd(let index, let message): return .object(["type": .string("text_end"), "contentIndex": .int(index), "content": .string(""), "partial": partial(message)])
         case .thinkingEnd(let index, let message): return .object(["type": .string("thinking_end"), "contentIndex": .int(index), "content": .string(""), "partial": partial(message)])
         case .toolCallEnd(let index, let call, let message): return .object(["type": .string("toolcall_end"), "contentIndex": .int(index), "toolCall": blocks([.toolCall(call)])[0], "partial": partial(message)])
