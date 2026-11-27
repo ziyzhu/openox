@@ -180,7 +180,7 @@ async function executeFileTool(operation: "read" | "write" | "edit", args: FileR
   const result = operation === "read" ? await tools.read.execute({ path: args.path!, offset: args.offset, limit: args.limit }, api, context)
     : operation === "write" ? await tools.write.execute({ path: args.path!, content: embedServiceAutomation(args.path!, args.content!) }, api, context)
     : await tools.edit.execute({ path: args.path!, edits: args.edits! }, api, context);
-  if (result.sleep !== undefined || result.wait !== undefined) throw new FileError("not_supported", "File operation cannot park", args.path);
+  if (result.kind !== undefined) throw new FileError("not_supported", "File operation cannot park", args.path);
   return result;
 }
 function readPage(result: ToolExecutionResult, args: FileRequest, totalLines: number) {
