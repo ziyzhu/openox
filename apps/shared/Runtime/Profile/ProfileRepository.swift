@@ -179,7 +179,7 @@ actor ProfileRepository {
     }
 
     func saveConversation(_ request: ConversationSaveRequest, storedTurns: [Turn]? = nil, in scope: ProfileScope) async -> ConversationSaveReceipt {
-        debugSaveGate.pass()
+        await debugSaveGate.pass()
         do {
             let reference = try DurableProfileStore.shared.reference(for: request.conversationID, in: scope)
             let meta: ConversationMeta

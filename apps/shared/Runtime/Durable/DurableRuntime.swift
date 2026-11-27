@@ -193,14 +193,14 @@ nonisolated final class DurableRuntime: @unchecked Sendable {
                 for id in Array(timers.keys) { clearTimer(id) }
                 for task in tasks.values { task.cancel() }
                 tasks.removeAll()
-                nativeQueue.sync {
+                context = nil
+                nativeQueue.async { [self] in
                     do {
                         _ = try database.perform("close", sql: "", params: [])
                         files?.close()
                     } catch { Log.agent.error("PiDurable database disposal failed: \(error.localizedDescription)") }
+                    continuation.resume()
                 }
-                context = nil
-                continuation.resume()
             }
         }
     }

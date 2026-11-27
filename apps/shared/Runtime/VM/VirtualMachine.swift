@@ -6,8 +6,6 @@ nonisolated final class VirtualMachineThread: Thread, @unchecked Sendable {
     private(set) var runLoop: CFRunLoop?
     private let ready = DispatchSemaphore(value: 0)
 
-    static let shared = started(name: "agent-javascript")
-
     static func started(name: String) -> VirtualMachineThread {
         let t = VirtualMachineThread()
         t.name = name
@@ -33,6 +31,11 @@ nonisolated final class VirtualMachineThread: Thread, @unchecked Sendable {
         guard let runLoop else { return }
         CFRunLoopPerformBlock(runLoop, CFRunLoopMode.defaultMode.rawValue, block)
         CFRunLoopWakeUp(runLoop)
+    }
+
+    func stop() {
+        cancel()
+        perform { CFRunLoopStop(CFRunLoopGetCurrent()) }
     }
 }
 
@@ -103,8 +106,21 @@ public actor VirtualMachine {
 }
 
 nonisolated private final class VirtualMachineRuntime: @unchecked Sendable {
-    private var thread: VirtualMachineThread { VirtualMachineThread.shared }
+    private let startedThread = Mutex<VirtualMachineThread?>(nil)
     private var vm: JSVirtualMachine?
+
+    private var thread: VirtualMachineThread {
+        startedThread.withLock { current in
+            if let current { return current }
+            let started = VirtualMachineThread.started(name: "agent-javascript")
+            current = started
+            return started
+        }
+    }
+
+    deinit {
+        startedThread.withLock { $0 }?.stop()
+    }
 
     func run(source: String, bridge: (any OxFunctionBridge)?, request: APIRequest? = nil, timeout: TimeInterval,
              imageOutput: (@MainActor @Sendable (TransientAttachment) throws -> Void)? = nil) async throws -> VirtualMachineOutput {
