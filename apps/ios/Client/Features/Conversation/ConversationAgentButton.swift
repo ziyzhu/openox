@@ -36,9 +36,6 @@ struct ConversationAgentButton: View {
             }
         }
         .glassEffect(.regular.interactive(), in: Capsule())
-        .animation(.smooth, value: title)
-        .animation(.smooth, value: subtitle)
-        .animation(.smooth, value: agentStatus)
         .accessibilityShowsLargeContentViewer {
             Text(verbatim: title)
         }
@@ -54,7 +51,6 @@ struct ConversationAgentButton: View {
             Text(verbatim: title)
                 .font(Theme.Fonts.labelMd)
                 .foregroundStyle(Theme.Colors.onSurface)
-                .contentTransition(.opacity)
             if let subtitle {
                 HStack(spacing: Theme.Spacing.xs) {
                     if parent != nil {
@@ -68,7 +64,6 @@ struct ConversationAgentButton: View {
                             .accessibilityIdentifier(A11yID.ConversationControls.agentStatus)
                     }
                     Text(verbatim: subtitle)
-                        .contentTransition(.opacity)
                 }
                 .font(Theme.Fonts.caption)
                 .foregroundStyle(Theme.Colors.onSurfaceMuted)
