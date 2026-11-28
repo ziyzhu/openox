@@ -647,14 +647,14 @@ struct RootView: View {
     @ViewBuilder
     private var readyConversationLayer: some View {
         ZStack {
-            if let shell = openingShell {
+            if let meta = openingShellMeta {
                 ConversationOpeningShell(
-                    meta: shell.meta,
-                    parentTitle: shell.meta.parentID.flatMap { conversations.summary($0)?.displayTitle },
-                    showsLoader: shell.showsLoader,
+                    meta: meta,
+                    parentTitle: meta.parentID.flatMap { conversations.summary($0)?.displayTitle },
+                    showsLoader: isLoadingConversation,
                     onShowSidebar: { setSidebar(isSplitLayout ? !showSidebar : true) }
                 )
-                .id(shell.meta.id)
+                .id(meta.id)
             } else if let conversation = conversations.current,
                conversations.openingId == nil {
                 ConversationPage(conversation: conversation,
@@ -692,7 +692,7 @@ struct RootView: View {
                     .id(ObjectIdentifier(conversation))
             }
 
-            if conversations.current == nil, openingShell == nil {
+            if conversations.current == nil, openingShellMeta == nil {
                 Group {
                     if let progress = storage.migrationProgress {
                         ProfileMigrationProgressView(stage: progress,
@@ -777,13 +777,16 @@ struct RootView: View {
         setSidebar(false)
     }
 
-    private var openingShell: (meta: ConversationMeta, showsLoader: Bool)? {
+    private var isLoadingConversation: Bool {
+        guard case .opening(let id) = conversationTransition else { return false }
+        return conversations.currentId != id
+    }
+
+    private var openingShellMeta: ConversationMeta? {
         switch conversationTransition {
-        case .idle:
-            return nil
-        case .sliding(let id), .opening(let id):
-            guard conversations.currentId != id, let meta = conversations.summary(id) else { return nil }
-            return (meta, conversationTransition == .opening(id))
+        case .idle: nil
+        case .sliding(let id): conversations.summary(id)
+        case .opening(let id): conversations.currentId == id ? nil : conversations.summary(id)
         }
     }
 
@@ -815,7 +818,7 @@ struct RootView: View {
     private func finishConversationSlide(_ id: UUID) {
         guard conversationTransition == .sliding(id) else { return }
         conversationTransition = .opening(id)
-        Log.ui.info("ConversationUX.lifecycle conversation=\(id) phase=shellSettled loading=\(openingShell != nil)")
+        Log.ui.info("ConversationUX.lifecycle conversation=\(id) phase=shellSettled loading=\(isLoadingConversation)")
     }
 
     private func finishConversationOpening(_ visibleId: UUID) {
