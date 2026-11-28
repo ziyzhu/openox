@@ -94,6 +94,16 @@ final class ConversationComposerModel {
             && (!draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !draftAttachments.isEmpty)
     }
 
+    var needsPublishing: Bool {
+        !stagedAttachments.isEmpty
+    }
+
+    private var stagedAttachments: [FileImporter.StagedFile] {
+        draftAttachments.compactMap { item -> FileImporter.StagedFile? in
+            if case .staged(let file) = item { file } else { nil }
+        }
+    }
+
     var isImporting: Bool {
         isPublishing || draftAttachments.contains { if case .importing = $0 { true } else { false } }
     }
@@ -217,9 +227,7 @@ final class ConversationComposerModel {
         guard canSubmit else { return nil }
         submission = .publishing
         defer { submission = .editing }
-        let staged = draftAttachments.compactMap { item -> FileImporter.StagedFile? in
-            if case .staged(let file) = item { file } else { nil }
-        }
+        let staged = stagedAttachments
         let published = staged.isEmpty ? [] : try await conversation.importAttachments(staged)
         var remaining = published.makeIterator()
         let attachments = draftAttachments.compactMap { item -> FileItem? in

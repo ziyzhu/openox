@@ -1616,6 +1616,7 @@ struct ConversationPage: View {
     }
 
     private func submitDraft(skillInvocation: UserSkillInvocation? = nil) {
+        if composer.needsPublishing { prepareComposerSubmission() }
         Task {
             do {
                 guard let message = try await composer.takeMessage(in: conversation) else { return }
