@@ -128,7 +128,7 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
     }
 
     private var blurRadius: CGFloat {
-        blurAllowed && interaction.dragActive ? maximumBlurRadius * progress : 0
+        blurAllowed ? maximumBlurRadius * progress : 0
     }
 
     private var workspaceOpacity: Double {
@@ -170,6 +170,11 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
         transaction.animation = animation
     }
 
+    private func snapBlurWhenTapped(_ transaction: inout Transaction) {
+        guard page == .workspace, !interaction.dragActive else { return }
+        transaction.animation = nil
+    }
+
     private func retimeSidebarMotion(_ transaction: inout Transaction) {
         retime(&transaction, with: transaction.pageDragSettle ?? sidebarMotion)
     }
@@ -181,7 +186,7 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
                 .safeAreaPadding(safeAreaInsets)
                 .ignoresSafeArea(.container)
                 .geometryGroup()
-                .blur(radius: blurRadius)
+                .transaction(snapBlurWhenTapped) { $0.blur(radius: blurRadius) }
                 .visualEffect { [shift = workspaceShift] view, _ in view.offset(x: shift) }
                 .transformEffect(workspaceParking)
                 .opacity(workspaceOpacity)
