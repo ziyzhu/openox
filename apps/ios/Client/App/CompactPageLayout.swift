@@ -128,7 +128,7 @@ struct CompactPageLayout<Sidebar: View, Workspace: View>: View {
     }
 
     private var blurRadius: CGFloat {
-        blurAllowed ? maximumBlurRadius * progress : 0
+        blurAllowed && interaction.dragActive ? maximumBlurRadius * progress : 0
     }
 
     private var workspaceOpacity: Double {
