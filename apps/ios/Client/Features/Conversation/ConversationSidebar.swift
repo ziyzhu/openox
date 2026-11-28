@@ -33,7 +33,6 @@ struct ConversationSidebar: View {
     @State private var searchQuery = ""
     @State private var searchPresented = false
     @State private var visibleCount = 20
-    @State private var pressedId: UUID?
 
     private let pageSize = 20
 
@@ -199,16 +198,9 @@ struct ConversationSidebar: View {
         SidebarRow(
             meta: meta,
             activity: activities[meta.id] ?? .idle(.read),
-            isActive: meta.id == (pressedId ?? currentId),
+            isActive: meta.id == currentId,
             edgeInset: edgeInset,
-            onPressChange: { pressed in
-                if pressed {
-                    pressedId = meta.id
-                    onPress(meta)
-                } else if pressedId == meta.id {
-                    pressedId = nil
-                }
-            }
+            onPress: { onPress(meta) }
         ) {
             searchPresented = false
             onOpen(meta)
@@ -253,7 +245,7 @@ private struct SidebarRow: View {
     let activity: Conversation.Activity
     let isActive: Bool
     let edgeInset: CGFloat
-    let onPressChange: (Bool) -> Void
+    let onPress: () -> Void
     let onTap: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -290,7 +282,7 @@ private struct SidebarRow: View {
                 .animation(reduceMotion ? nil : Theme.Animation.standard, value: activity)
             }
         }
-        .buttonStyle(SidebarRowButtonStyle(isActive: isActive, edgeInset: edgeInset, onPressChange: onPressChange))
+        .buttonStyle(SidebarRowButtonStyle(isActive: isActive, edgeInset: edgeInset, onPress: onPress))
         .accessibilityLabel(meta.displayTitle)
         .accessibilityValue(accessibilityValue)
         .accessibilityIdentifier(A11yID.Sidebar.row(meta.id.uuidString))
@@ -396,7 +388,7 @@ private extension Conversation.Activity.AwaitingAction {
 private struct SidebarRowButtonStyle: ButtonStyle {
     let isActive: Bool
     let edgeInset: CGFloat
-    let onPressChange: (Bool) -> Void
+    let onPress: () -> Void
 
     func makeBody(configuration: Configuration) -> some View {
         let tinted = isActive || configuration.isPressed
@@ -411,7 +403,7 @@ private struct SidebarRowButtonStyle: ButtonStyle {
             .padding(.vertical, 2)
             .contentShape(Rectangle())
             .onChange(of: configuration.isPressed) { _, pressed in
-                onPressChange(pressed)
+                if pressed { onPress() }
             }
     }
 }

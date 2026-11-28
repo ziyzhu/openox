@@ -53,11 +53,37 @@ struct FileThumbnail: View {
 
     let attachment: FileItem
     let style: Style
-    var background: DynamicColor? = nil
-    var previewSourceID: String? = nil
-    var scope: ProfileScope? = StorageRoot.currentScope
+    let background: DynamicColor?
+    let previewSourceID: String?
+    let scope: ProfileScope?
     @State private var image: UIImage?
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let cache: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.totalCostLimit = 48 * 1024 * 1024
+        return cache
+    }()
+
+    init(
+        attachment: FileItem,
+        style: Style,
+        background: DynamicColor? = nil,
+        previewSourceID: String? = nil,
+        scope: ProfileScope? = StorageRoot.currentScope
+    ) {
+        self.attachment = attachment
+        self.style = style
+        self.background = background
+        self.previewSourceID = previewSourceID
+        self.scope = scope
+        _image = State(initialValue: Self.cache.object(forKey: Self.cacheKey(attachment, style)))
+    }
+
+    private static func cacheKey(_ attachment: FileItem, _ style: Style) -> NSString {
+        "\(attachment.fileURL.path)|\(style.size)" as NSString
+    }
 
     var body: some View {
         Group {
@@ -89,8 +115,9 @@ struct FileThumbnail: View {
         .clipShape(shape)
         .filePreviewTransitionSource(attachment, sourceID: previewSourceID)
         .task(id: attachment.fileURL) {
-            image = nil
-            guard attachment.availability == .local else { return }
+            let key = Self.cacheKey(attachment, style)
+            image = Self.cache.object(forKey: key)
+            guard image == nil, attachment.availability == .local else { return }
             let kind = attachment.kind
             guard kind == .image || kind == .pdf else { return }
             let size = CGSize(width: style.size * 3, height: style.size * 3)
@@ -101,8 +128,11 @@ struct FileThumbnail: View {
                     if kind == .image { return Self.thumbnail(data: data, targetPixelSize: targetPixelSize) }
                     return PDFDocument(data: data)?.page(at: 0)?.thumbnail(of: size, for: .cropBox)
                 }.value
-                guard !Task.isCancelled else { return }
-                image = loaded
+                guard !Task.isCancelled, let loaded else { return }
+                Self.cache.setObject(loaded, forKey: key, cost: Self.cost(of: loaded))
+                withAnimation(reduceMotion ? nil : Theme.Animation.quick) {
+                    image = loaded
+                }
             } catch is CancellationError {
             } catch {
                 Log.ui.error("FileThumbnail.read file=\(attachment.fileName) error=\(error.localizedDescription)")
@@ -128,6 +158,11 @@ struct FileThumbnail: View {
             thumbnailOptions as CFDictionary
         ) else { return nil }
         return UIImage(cgImage: thumbnail)
+    }
+
+    private static func cost(of image: UIImage) -> Int {
+        guard let cgImage = image.cgImage else { return 1 }
+        return cgImage.bytesPerRow * cgImage.height
     }
 
     private var shape: RoundedRectangle {
