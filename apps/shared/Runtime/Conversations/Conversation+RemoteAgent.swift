@@ -20,9 +20,19 @@ extension Conversation {
     func selectAgent(_ endpoint: URL?) -> Bool {
         guard canChangeAgent || remoteAgent?.endpoint == endpoint else { return false }
         guard remoteAgent?.endpoint != endpoint else { return true }
-        remoteAgent = endpoint.map { RemoteAgentBinding(endpoint: $0, model: RemoteAgentDirectory.shared.defaultModels[$0]) }
+        remoteAgent = endpoint.map { RemoteAgentBinding(endpoint: $0, model: RemoteAgentDirectory.shared.newConversationModel(for: $0)) }
         Log.session.info("Conversation.agent selected id=\(id) agent=\(endpoint?.absoluteString ?? "local")")
         return true
+    }
+
+    func adoptDefaultRemoteModel() {
+        guard canChangeAgent, var binding = remoteAgent, binding.conversationID == nil else { return }
+        let model = RemoteAgentDirectory.shared.newConversationModel(for: binding.endpoint)
+        guard binding.model != model else { return }
+        binding.model = model
+        binding.thinkingLevel = nil
+        remoteAgent = binding
+        Log.session.info("Conversation.agent default model id=\(id) model=\(model?.id ?? "default")")
     }
 
     func selectRemoteModel(_ model: RemoteAgentModel) {

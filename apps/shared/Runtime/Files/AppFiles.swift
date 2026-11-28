@@ -195,12 +195,16 @@ extension Conversation {
             let next = try JSONDecoder().decode(RemoteAgentConfiguration.self, from: Data(content.utf8)).validated()
             let current = RemoteAgentDirectory.shared.configuration
             guard next != current else { return }
-            let added = next.agents.filter { !current.agents.contains($0) }
-            let removed = current.agents.filter { !next.agents.contains($0) }
+            let added = next.agents.filter { agent in !current.agents.contains { $0.endpoint == agent.endpoint && $0.name == agent.name } }
+            let removed = current.agents.filter { agent in !next.agents.contains { $0.endpoint == agent.endpoint && $0.name == agent.name } }
             let defaultName = next.defaultEndpoint.map { endpoint in next.agents.first { $0.endpoint == endpoint }?.name ?? endpoint.absoluteString } ?? Device.localAgentName
             let summary = (added.map { L10n.string("Add \($0.name) at \($0.endpoint.absoluteString)") }
                 + removed.map { L10n.string("Remove \($0.name)") }
-                + (next.defaultEndpoint != current.defaultEndpoint ? [L10n.string("Default: \(defaultName)")] : []))
+                + (next.defaultEndpoint != current.defaultEndpoint ? [L10n.string("Default: \(defaultName)")] : [])
+                + next.agents.compactMap { agent in
+                    guard let previous = current.agents.first(where: { $0.endpoint == agent.endpoint }), previous.model != agent.model else { return nil }
+                    return L10n.string("\(agent.name) default model: \(agent.model.map { "\($0.provider)/\($0.id)" } ?? "agent default")")
+                })
             try await requireApproval(action: Actions.appSetAgents, args: [
                 "added": added.map { "\($0.name) — \($0.endpoint.absoluteString)" },
                 "removed": removed.map { "\($0.name) — \($0.endpoint.absoluteString)" },

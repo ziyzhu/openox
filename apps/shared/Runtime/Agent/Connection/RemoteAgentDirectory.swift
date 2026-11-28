@@ -4,6 +4,7 @@ import Observation
 nonisolated struct RemoteAgent: Codable, Equatable, Hashable, Identifiable, Sendable {
     var name: String
     var endpoint: URL
+    var model: AgentModelReference?
 
     var id: URL { endpoint }
 }
@@ -39,7 +40,7 @@ nonisolated struct RemoteAgentConfiguration: Codable, Equatable, Sendable {
             guard let endpoint = RemoteAgentDirectory.endpoint(from: agent.endpoint.absoluteString) else {
                 throw RuntimeError.bridge("Agent \(name) has an invalid address; use a Tailscale name such as my-mac.tailnet.ts.net or a ws:// or wss:// URL")
             }
-            return RemoteAgent(name: name, endpoint: endpoint)
+            return RemoteAgent(name: name, endpoint: endpoint, model: agent.model)
         }
         guard Set(next.agents.map { $0.name.lowercased() }).count == next.agents.count,
               Set(next.agents.map(\.endpoint)).count == next.agents.count else {
@@ -110,7 +111,20 @@ final class RemoteAgentDirectory {
     }
 
     var defaultBinding: RemoteAgentBinding? {
-        defaultEndpoint.map { RemoteAgentBinding(endpoint: $0, model: defaultModels[$0]) }
+        defaultEndpoint.map { RemoteAgentBinding(endpoint: $0, model: newConversationModel(for: $0)) }
+    }
+
+    func newConversationModel(for endpoint: URL) -> AgentModelReference? {
+        agent(for: endpoint)?.model ?? defaultModels[endpoint]
+    }
+
+    func setDefaultModel(_ model: AgentModelReference?, for endpoint: URL) throws {
+        guard let index = configuration.agents.firstIndex(where: { $0.endpoint == endpoint }) else { return }
+        var next = configuration
+        next.agents[index].model = model
+        try next.save()
+        configuration = next
+        Log.agent.info("RemoteAgentDirectory.defaultModel endpoint=\(endpoint.absoluteString) model=\(model.map { "\($0.provider)/\($0.id)" } ?? "agent")")
     }
 
     func setDefault(_ endpoint: URL?) throws {

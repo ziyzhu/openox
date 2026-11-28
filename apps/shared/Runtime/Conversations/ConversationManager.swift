@@ -373,7 +373,10 @@ final class ConversationManager {
     @discardableResult
     func startNewConversation(reusingEmpty: Bool = true) -> Conversation {
         ensureRepositoryScope()
-        if reusingEmpty, let current, current.transcript.isEmpty, !current.isTemporary { return current }
+        if reusingEmpty, let current, current.transcript.isEmpty, !current.isTemporary {
+            current.adoptDefaultRemoteModel()
+            return current
+        }
         let conversation = makeConversation()
         register(conversation, as: ConversationID(conversation.id))
         setCurrent(conversation)

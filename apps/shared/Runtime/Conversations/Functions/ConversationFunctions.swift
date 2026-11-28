@@ -70,7 +70,7 @@ extension Conversation {
                     : "Use one of: \(names.joined(separator: ", ")); or omit agent to run on this device.")
         }
         let folder = fields["folder"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return RemoteAgentBinding(endpoint: agent.endpoint, model: directory.defaultModels[agent.endpoint], folder: folder?.isEmpty == false ? folder : nil)
+        return RemoteAgentBinding(endpoint: agent.endpoint, model: directory.newConversationModel(for: agent.endpoint), folder: folder?.isEmpty == false ? folder : nil)
     }
 
     public func sendChildConversation(id: String, text: String, purpose: String) async throws -> JSONValue? {

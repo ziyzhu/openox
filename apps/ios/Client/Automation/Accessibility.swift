@@ -76,6 +76,8 @@ nonisolated enum A11yID {
         static let close = "settings.close"
         static let whatsNew = "settings.whatsNew"
         static let defaultModel = "settings.defaultModel"
+        static let defaultModelSearch = "settings.defaultModel.search"
+        static func defaultModelOption(_ id: String) -> String { "settings.defaultModel.option.\(id)" }
         static let customProviderName = "settings.customProviderName"
         static let customProviderURL = "settings.customProviderURL"
         static let customProviderKey = "settings.customProviderKey"

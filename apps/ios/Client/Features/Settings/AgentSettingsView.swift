@@ -62,6 +62,8 @@ struct AgentSettingsView: View {
                         .buttonStyle(.plain)
                         .accessibilityIdentifier(A11yID.Settings.defaultModel)
                     }
+                } else if let endpoint = directory.defaultEndpoint {
+                    remoteModelSection(endpoint)
                 }
             }
             .settingsPagePadding()
@@ -117,6 +119,46 @@ struct AgentSettingsView: View {
         }
         .accessibilityIdentifier(A11yID.Settings.agentRow(agent.endpoint.absoluteString))
         .accessibilityAction(named: Text("Remove")) { pendingRemoval = agent }
+    }
+
+    private func remoteModelSection(_ endpoint: URL) -> some View {
+        let models = directory.models[endpoint] ?? []
+        let agentDefault = L10n.string("Agent default")
+        let options = [SettingsSelectionOption(id: "", value: "", title: agentDefault,
+                                               subtitle: directory.modelName(nil, endpoint: endpoint),
+                                               accessibilityIdentifier: A11yID.Settings.defaultModelOption("agent"))]
+            + models.map { model in
+                SettingsSelectionOption(id: model.id, value: model.id, title: model.name, subtitle: model.reference.provider,
+                                        accessibilityIdentifier: A11yID.Settings.defaultModelOption(model.id))
+            }
+        let saved = directory.agent(for: endpoint)?.model
+        let value = saved.map { directory.modelName($0, endpoint: endpoint) ?? $0.id } ?? agentDefault
+        return SettingsSection(
+            footer: "Used for new conversations on \(directory.displayName(for: endpoint)). Agent default follows the model set on that computer. Existing conversations keep their model.",
+            layout: .row
+        ) {
+            NavigationLink {
+                SettingsSelectionPickerView(
+                    title: "Default model",
+                    options: options,
+                    selection: Binding(
+                        get: { saved.map { "\($0.provider)/\($0.id)" } ?? "" },
+                        set: { id in setDefaultModel(models.first { $0.id == id }?.reference, for: endpoint) }
+                    ),
+                    searchAccessibilityIdentifier: A11yID.Settings.defaultModelSearch
+                )
+            } label: {
+                SettingsDisclosureRow(title: "Model", value: Text(verbatim: value),
+                                      isLoading: directory.statuses[endpoint] == .checking && models.isEmpty)
+            }
+            .buttonStyle(.plain)
+            .disabled(models.isEmpty)
+            .accessibilityIdentifier(A11yID.Settings.defaultModel)
+        }
+    }
+
+    private func setDefaultModel(_ model: AgentModelReference?, for endpoint: URL) {
+        do { try directory.setDefaultModel(model, for: endpoint) } catch { errorMessage = error.localizedDescription }
     }
 
     private func subtitle(_ status: RemoteAgentStatus?) -> String {
@@ -236,8 +278,8 @@ struct DefaultAgentSettingsSection: View {
     private var value: Text {
         guard let endpoint = directory.defaultEndpoint else { return Text(verbatim: "\(Device.localAgentName) · \(DefaultAgentValue.model(registry))") }
         let name = directory.displayName(for: endpoint)
-        guard let model = directory.model(nil, endpoint: endpoint) else { return Text(verbatim: name) }
-        return Text(verbatim: "\(name) · \(model.name)")
+        guard let model = directory.modelName(directory.newConversationModel(for: endpoint), endpoint: endpoint) else { return Text(verbatim: name) }
+        return Text(verbatim: "\(name) · \(model)")
     }
 
     var body: some View {
