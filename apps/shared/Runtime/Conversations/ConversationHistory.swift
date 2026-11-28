@@ -6,7 +6,7 @@ nonisolated struct PartialHistory: Sendable, Equatable {
 }
 
 nonisolated enum ConversationHistory: Sendable {
-    static let userTurnsPerPage = 10
+    static let userTurnsPerPage = 5
 
     case complete
     case partial(PartialHistory)
