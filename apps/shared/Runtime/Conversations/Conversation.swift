@@ -13,7 +13,35 @@ final class Conversation: Identifiable {
     var appFileRevisions: [String: String] = [:]
     @ObservationIgnored private(set) var durableRoute: DurableConversationRoute?
     @ObservationIgnored var preparedConfiguration: AgentConfiguration?
-    @ObservationIgnored var durablePreparation: Task<Void, Error>?
+    enum DurablePreparation {
+        case deferred(@MainActor () -> Task<Void, Error>)
+        case running(Task<Void, Error>)
+        case finished
+    }
+    @ObservationIgnored var durablePreparationState = DurablePreparation.finished
+    var durablePreparation: Task<Void, Error>? {
+        switch durablePreparationState {
+        case .deferred(let start):
+            let task = start()
+            durablePreparationState = .running(task)
+            Log.session.info("Conversation.durablePreparation started id=\(id)")
+            return task
+        case .running(let task):
+            return task
+        case .finished:
+            return nil
+        }
+    }
+    var startedDurablePreparation: Task<Void, Error>? {
+        if case .running(let task) = durablePreparationState { task } else { nil }
+    }
+    var isDurablePreparationDeferred: Bool {
+        if case .deferred = durablePreparationState { true } else { false }
+    }
+    var isUnsentDraft: Bool {
+        !isTemporary && transcript.isEmpty && (storedTurns ?? []).isEmpty && history.partial == nil && queuedMessages.isEmpty && !isBusy
+            && scheduleID == nil && parentID == nil
+    }
     @ObservationIgnored var durableForkSource: (reference: DurableConversationReference, users: Int)?
     var conversationReference: DurableConversationReference? { durableRoute?.reference }
 
@@ -21,7 +49,12 @@ final class Conversation: Identifiable {
         guard durableRoute == nil || !isBusy else { throw RuntimeError.bridge("Conversation worker is still running") }
         if let reference = route?.reference {
             guard reference.profileID == scope.profileID else { throw RuntimeError.bridge("Conversation belongs to another Profile") }
+            let previousID = id
             id = reference.compatibilityID.rawValue
+            if isSelected, previousID != id {
+                serviceManager.removeAttachedServices(for: previousID)
+                serviceManager.setAttachedServices(serviceAttachments.loadedServices, for: id)
+            }
         }
         durableRoute = route
         if route != nil { resumeRemoteRun() }
@@ -144,7 +177,8 @@ final class Conversation: Identifiable {
             guard !Task.isCancelled else { return }
             let authenticationMs = TurnLatencyTrace.milliseconds(authenticationStarted.duration(to: .now))
             Log.perf.info("LLM.auth.prepare conversation=\(self.id) client=\(client.id) model=\(model.id) outcome=\(authenticationOutcome.rawValue) durationMs=\(authenticationMs)")
-            guard !client.preparationRequiresPrompt || self.modelPreparationIntent else { return }
+            let needsIntent = client.preparationRequiresPrompt || self.isDurablePreparationDeferred
+            guard !needsIntent || self.modelPreparationIntent else { return }
             let systemPrompt: String?
             let tools: [any AgentTool]
             do {
@@ -255,7 +289,7 @@ final class Conversation: Identifiable {
         deselect()
         serviceManager.browserActionSessions.closeSession(for: id)
         serviceManager.browserSessions.close(scopeID: id)
-        if cancelling { durablePreparation?.cancel(); cancelAll() }
+        if cancelling { startedDurablePreparation?.cancel(); cancelAll() }
         if isTemporary { Task { await ProfileProtocol.releaseDurableTemporaryConversation(self) } }
     }
 

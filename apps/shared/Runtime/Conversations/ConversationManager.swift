@@ -373,8 +373,9 @@ final class ConversationManager {
     @discardableResult
     func startNewConversation(reusingEmpty: Bool = true) -> Conversation {
         ensureRepositoryScope()
-        if reusingEmpty, let current, current.transcript.isEmpty, !current.isTemporary {
+        if reusingEmpty, let current, current.isUnsentDraft {
             current.adoptDefaultRemoteModel()
+            setCurrent(current)
             return current
         }
         let conversation = makeConversation()
@@ -1016,7 +1017,9 @@ final class ConversationManager {
 
     private func attachPersistence(_ conversation: Conversation, afterPreparation: (@MainActor () async throws -> Void)? = nil) {
         conversation.conversationManager = self
-        conversation.durablePreparation = Task { @MainActor [weak self, weak conversation] in
+        let deferred = !conversation.isTemporary && conversation.durableForkSource == nil && afterPreparation == nil
+            && conversation.isUnsentDraft && (try? DurableProfileStore.shared.reference(for: ConversationID(conversation.id), in: conversation.scope)) == nil
+        let prepare = { @MainActor [weak self, weak conversation] () -> Task<Void, Error> in Task { @MainActor [weak self, weak conversation] in
             guard let self, let conversation else { throw CancellationError() }
             if conversation.isTemporary {
                 try await ProfileProtocol.prepareDurableTemporaryConversation(conversation, caseID: ProfileProtocol.durableTemporarySessionID ?? UUID())
@@ -1044,8 +1047,9 @@ final class ConversationManager {
                 if existing == nil { persist(conversation) }
             }
             try await afterPreparation?()
-            conversation.durablePreparation = nil
-        }
+            conversation.durablePreparationState = .finished
+        } }
+        conversation.durablePreparationState = deferred ? .deferred(prepare) : .running(prepare())
         if !conversation.isTemporary {
             conversation.onPersistableChange = { [weak self, weak conversation] in
                 guard let self, let conversation else { return }
@@ -1155,14 +1159,35 @@ final class ConversationManager {
         let id = ConversationID(conversation.id)
         touch(id)
         if case .active(let current) = selection, current === conversation { return }
-        let outgoing = current
+        let outgoing = current.flatMap { $0 === conversation ? nil : $0 }
         selection = .active(conversation)
         conversation.select()
         outgoing?.deselect()
         if let outgoing, outgoing.isTemporary {
             discardTemporary(ConversationID(outgoing.id))
+        } else if let outgoing, outgoing.isUnsentDraft {
+            discardUnsentDraft(outgoing)
         }
         trimHydrated()
+    }
+
+    private func discardUnsentDraft(_ conversation: Conversation) {
+        let id = ConversationID(conversation.id)
+        if case .debouncing(_, let task) = records[id]?.persistence { task.cancel() }
+        records[id] = nil
+        accessOrdinals[id] = nil
+        let preparation = conversation.startedDurablePreparation
+        let durable = preparation != nil || conversation.conversationReference != nil
+        conversation.release(cancelling: false)
+        Log.session.info("ConversationManager.draft discarded conversation=\(id) durable=\(durable)")
+        guard durable else { return }
+        let repository = repository
+        Task { @MainActor in
+            _ = try? await preparation?.value
+            guard let reference = conversation.conversationReference else { return }
+            do { try await repository.deleteConversation(reference.compatibilityID, in: conversation.scope) }
+            catch { Log.session.error("ConversationManager.draft cleanup failed conversation=\(reference.compatibilityID) error=\(error.localizedDescription)") }
+        }
     }
 
     private func register(_ conversation: Conversation, as id: ConversationID) {
