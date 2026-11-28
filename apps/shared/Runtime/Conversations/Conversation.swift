@@ -1333,8 +1333,9 @@ final class Conversation: Identifiable {
     func retryFailedTurn() -> SubmissionReceipt? {
         guard !isBusy, case .failed = turnEnding,
               case let .agent(turn, target) = document.turns.last else { return nil }
-        if let assistant = turn.generations.last?.assistantMessage,
-           assistant.stopReason == .length, assistant.content.toolCalls.isEmpty {
+        let stoppedAtLength = turn.generations.last?.assistantMessage.map { $0.stopReason == .length && $0.content.toolCalls.isEmpty } ?? false
+        if remoteAgent != nil || stoppedAtLength {
+            Log.session.info("Conversation.retryFailed continue id=\(id) remote=\(remoteAgent != nil)")
             return enqueue(L10n.string("Continue", comment: "Message sent when the user resumes a stopped conversation reply."))
         }
         Log.session.info("Conversation.retryFailed id=\(id) turn=\(target.rawValue)")
